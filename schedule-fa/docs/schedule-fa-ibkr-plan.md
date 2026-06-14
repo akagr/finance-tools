@@ -275,8 +275,11 @@ schedulefa generate \
   rows (initial/peak/closing/dividend/proceeds in INR, per-figure audit, review flags);
   `report` renders md/csv/json with an audit trail + reconciliation. `generate` runs the
   full pipeline end-to-end. Conversion-date conventions documented in `build.go`.
-- **M4 — Exact peak:** daily share reconstruction from trades + pluggable price provider
-  (mode B). Mode C stays as labelled fallback.
+- **M4 — Exact peak:** ✅ `peak.ComputeExact` (mode B) reconstructs a daily share series and
+  values it against a daily price series (`prices.CSVStore`, preceding-trading-day fallback)
+  × TTBR, maximising INR. Also returns the **true Table A2 peak** (max daily NAV).
+  `--prices` selects mode B; mode C remains the labelled fallback. Splits not auto-adjusted
+  (flagged via corporate actions).
 - **M5 — A2 + edge cases:** ✅ Table A2 custodial-account row (aggregates A3; account peak
   is a flagged upper bound, cash excluded); `entities` metadata package (CSV override for
   address/ZIP/country code/nature, via `--entities`); RSU vesting date as acquisition date;

@@ -79,10 +79,17 @@ type valuedEvent struct {
 	Date  time.Time
 }
 
+// Options carries optional inputs to Build.
+type Options struct {
+	Entities *entities.Store // entity metadata override (nil ok)
+	A2Peak   *fx.Conversion  // exact portfolio peak (mode B); nil => upper-bound sum
+}
+
 // Build assembles Tables A2 and A3 from the statement, FX store, computed peaks,
-// and optional user-supplied entity metadata (ents may be nil).
-func Build(s *model.Statement, store fx.Store, peaks []peak.Result, ents *entities.Store) (*Report, error) {
+// and options.
+func Build(s *model.Statement, store fx.Store, peaks []peak.Result, opts Options) (*Report, error) {
 	rep := &Report{Year: s.Year}
+	ents := opts.Entities
 	yearEnd := time.Date(s.Year, time.December, 31, 0, 0, 0, 0, time.UTC)
 
 	peakByKey := map[string]peak.Result{}
@@ -207,14 +214,15 @@ func Build(s *model.Statement, store fx.Store, peaks []peak.Result, ents *entiti
 		rep.A3 = append(rep.A3, row)
 	}
 
-	rep.A2 = []A2Row{buildA2(s, rep.A3)}
+	rep.A2 = []A2Row{buildA2(s, rep.A3, opts.A2Peak)}
 	return rep, nil
 }
 
-// buildA2 assembles the custodial-account row by aggregating the A3 figures.
-// The account peak is an upper bound (it sums per-security peaks, which do not
-// all occur on the same day); cash balances are not included.
-func buildA2(s *model.Statement, a3 []A3Row) A2Row {
+// buildA2 assembles the custodial-account row by aggregating the A3 figures. The
+// account peak is the exact daily-NAV maximum when supplied (mode B); otherwise
+// it is an upper bound (sum of per-security peaks, which are not simultaneous).
+// Cash balances are not included either way.
+func buildA2(s *model.Statement, a3 []A3Row, exactPeak *fx.Conversion) A2Row {
 	acc := s.Account
 	var closes, peaks, credited []Amount
 	for _, r := range a3 {
@@ -231,11 +239,17 @@ func buildA2(s *model.Statement, a3 []A3Row) A2Row {
 		AccountNumber:  acc.Number,
 		Status:         "Owner",
 		OpenDate:       fmtDate(acc.OpenDate),
-		PeakBalance:    sumAmounts(peaks),
 		ClosingBalance: sumAmounts(closes),
 		GrossCredited:  sumAmounts(credited),
 	}
-	notes := []string{"peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included"}
+	var notes []string
+	if exactPeak != nil {
+		row.PeakBalance = Amount{INR: exactPeak.Result, Audit: []fx.Conversion{*exactPeak}}
+		notes = append(notes, "peak balance is the exact daily-NAV maximum on "+fmtDate(exactPeak.RateDate)+"; cash not included")
+	} else {
+		row.PeakBalance = sumAmounts(peaks)
+		notes = append(notes, "peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included")
+	}
 	if code == "" {
 		notes = append(notes, "institution country code unknown")
 	}

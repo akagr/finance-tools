@@ -15,6 +15,7 @@ import (
 	"github.com/akagr/tax-tools/schedule-fa/internal/fx"
 	"github.com/akagr/tax-tools/schedule-fa/internal/ibkr"
 	"github.com/akagr/tax-tools/schedule-fa/internal/peak"
+	"github.com/akagr/tax-tools/schedule-fa/internal/prices"
 	"github.com/akagr/tax-tools/schedule-fa/internal/report"
 	"github.com/akagr/tax-tools/schedule-fa/internal/schedulefa"
 )
@@ -62,7 +63,7 @@ func cmdGenerate(args []string) int {
 		flexQuery = fs.String("flex-query", "", "IBKR Flex Query id (online mode; M6)")
 		rates     = fs.String("rates", "", "path to an SBI TTBR rates CSV (overrides bundled)")
 		entitiesP = fs.String("entities", "data/entities", "entity metadata CSV file or dir (optional)")
-		prices    = fs.String("prices", "", "path to a daily prices CSV (enables exact peak; M4)")
+		pricesP   = fs.String("prices", "", "path to a daily prices CSV/dir (enables exact peak, mode B)")
 		out       = fs.String("out", "private/report", "output directory (default under gitignored private/)")
 		format    = fs.String("format", "md,csv,json", "comma-separated: md,csv,json")
 	)
@@ -99,10 +100,6 @@ func cmdGenerate(args []string) int {
 	fmt.Printf("  open positions   : %d (year-end snapshot)\n", len(st.OpenPositions))
 	fmt.Printf("  lots/trades/divs : %d / %d / %d\n", len(st.Lots), len(st.Trades), len(st.Dividends))
 
-	if *prices != "" {
-		fmt.Fprintln(os.Stderr, "note: --prices (exact peak, mode B) is not wired until M4; using approximate peak (mode C)")
-	}
-
 	// Load SBI TTBR rates (M2). Default to ./data/ttbr if --rates is omitted.
 	ratesPath := orDefault(*rates, "data/ttbr")
 	store, err := fx.LoadRateKeeper(ratesPath)
@@ -113,18 +110,36 @@ func cmdGenerate(args []string) int {
 	}
 	fmt.Printf("  rates            : %s\n", ratesPath)
 
-	// Peak (mode C) → A3 rows → render.
-	peaks, err := peak.Compute(st, store, peak.ModeApprox, nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: computing peak values: %v\n", err)
-		return 1
+	// Peak: exact (mode B) when --prices is given, else approximate (mode C).
+	var peaks []peak.Result
+	var a2Peak *fx.Conversion
+	if *pricesP != "" {
+		priceStore, err := prices.Load(*pricesP)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: loading prices from %q: %v\n", *pricesP, err)
+			return 1
+		}
+		secs, port, exact, err := peak.ComputeExact(st, store, priceStore)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: computing exact peak: %v\n", err)
+			return 1
+		}
+		peaks = secs
+		if exact {
+			a2Peak = &port
+		}
+		fmt.Printf("  peak mode        : exact (mode B), prices %s%s\n", *pricesP, exactNote(exact))
+	} else {
+		peaks, _ = peak.Compute(st, store, peak.ModeApprox, nil)
+		fmt.Printf("  peak mode        : approximate (mode C) — pass --prices for exact (mode B)\n")
 	}
+
 	ents, err := entities.Load(*entitiesP)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: loading entity metadata from %q: %v\n", *entitiesP, err)
 		return 1
 	}
-	rep, err := schedulefa.Build(st, store, peaks, ents)
+	rep, err := schedulefa.Build(st, store, peaks, schedulefa.Options{Entities: ents, A2Peak: a2Peak})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: building report: %v\n", err)
 		return 1
@@ -170,6 +185,13 @@ func parseFormats(s string) ([]report.Format, error) {
 		return nil, fmt.Errorf("no valid formats in %q", s)
 	}
 	return out, nil
+}
+
+func exactNote(exact bool) string {
+	if exact {
+		return ""
+	}
+	return " (some held days missing prices — A2 peak left as upper bound)"
 }
 
 func orDefault(s, def string) string {

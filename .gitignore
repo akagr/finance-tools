@@ -22,5 +22,6 @@ flex-*.xml
 secrets.*
 # Generated reports default to private/ (above) — real ones contain holdings.
 
-# Third-party SBI TTBR data (download per data/ttbr/README.md; not vendored)
+# Third-party / user data (not vendored — see each dir's README)
 schedule-fa/data/ttbr/*.csv
+schedule-fa/data/prices/*.csv

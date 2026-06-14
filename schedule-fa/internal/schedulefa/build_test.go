@@ -41,7 +41,7 @@ func TestBuildA3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Build(st, store, peaks, nil)
+	rep, err := Build(st, store, peaks, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestBuildEntitiesOverrideAndRSU(t *testing.T) {
 
 	store := fakeStore{big.NewRat(80, 1)}
 	peaks, _ := peak.Compute(st, store, peak.ModeApprox, nil)
-	rep, _ := Build(st, store, peaks, ents)
+	rep, _ := Build(st, store, peaks, Options{Entities: ents})
 	row := rep.A3[0]
 
 	if row.Address != "123 Main St, City" || row.ZIP != "94000" || row.NatureEntity != "Listed company" {
@@ -138,7 +138,7 @@ func TestBuildExitedPositionHasNoClosing(t *testing.T) {
 	}
 	store := fakeStore{big.NewRat(80, 1)}
 	peaks, _ := peak.Compute(st, store, peak.ModeApprox, nil)
-	rep, _ := Build(st, store, peaks, nil)
+	rep, _ := Build(st, store, peaks, Options{})
 	row := rep.A3[0]
 	if row.ClosingValue.INR.Amount.Sign() != 0 {
 		t.Errorf("closing value = %s, want 0 for an exited position", row.ClosingValue.INR.Amount.RatString())

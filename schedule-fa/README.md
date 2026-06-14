@@ -18,11 +18,13 @@ challenges, locked decisions, architecture, and milestones.
 - **M3 — Table A3 + reports** ✅ — approximate peak (mode C) + row builder produce Table A3
   (initial/peak/closing/dividend/proceeds in INR, audit trail, review flags), rendered to
   **Markdown, CSV, and JSON**. `generate` runs the full pipeline and writes the report.
-- **M5 — Table A2 + edge cases** ✅ — custodial-account row (aggregated, flagged peak),
-  `--entities` metadata override (address/ZIP/country code/nature), RSU vesting dates, and
-  corporate-action review flags.
+- **M5 — Table A2 + edge cases** ✅ — custodial-account row, `--entities` metadata override
+  (address/ZIP/country code/nature), RSU vesting dates, and corporate-action review flags.
+- **M4 — Exact peak** ✅ — `--prices` enables mode B: daily share reconstruction valued
+  against a daily price series (preceding-trading-day fallback) × TTBR, plus a **true Table
+  A2 peak** (max daily NAV). Mode C remains the fallback when no prices are supplied.
 
-Next: M4 (exact peak from a daily price series), then M6 (Flex Web Service online pull).
+Next: M6 (Flex Web Service online pull), then M7 (HTML/PDF polish).
 
 ## Usage (target)
 
