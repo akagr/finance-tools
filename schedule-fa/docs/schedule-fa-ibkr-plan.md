@@ -141,17 +141,21 @@ prices are unavailable. See §5 challenges.
 ## 4. The other hard part: SBI TTBR historical rates
 
 There is **no official free SBI TTBR API**. SBI publishes a daily "FOREX CARD RATES" PDF;
-historical archives are not cleanly downloadable. Strategy:
+historical archives are not cleanly downloadable. **Decision (M2):** consume the
+community-maintained **SBI FX RateKeeper** dataset
+([sahilgupta/sbi-fx-ratekeeper](https://github.com/sahilgupta/sbi-fx-ratekeeper)) — daily
+per-currency CSVs back to ~Jan 2020, with the source PDF linked per row for verification.
 
-- Ship a **bundled CSV** of historical USD (and EUR/GBP/etc.) TTBR rates, dated, that the
-  user can extend.
-- Allow a **user-supplied rates CSV** override (`--rates rates.csv`).
-- **Holiday / missing-day rule:** if no rate is published for a date (weekend/holiday),
-  use the rate of the **immediately preceding** working day. Implement this lookup
-  explicitly and log which fallback date was used.
-- Provide a small fetcher/updater as a *separate* concern (best-effort scraper of a known
-  public mirror), kept out of the core path so a broken upstream never blocks report
-  generation.
+- **Format:** RateKeeper per-currency CSV (`DATE`, `TT BUY`, …); currency from the
+  filename. See [`data/ttbr/README.md`](../data/ttbr/README.md).
+- **Not bundled:** the data is third-party and updated daily, so it is downloaded into
+  `data/ttbr/` (gitignored if it contains a fork) rather than vendored. The user points
+  `--rates` at a file or directory.
+- **Non-publish days:** a `TT BUY` of `0.00` is treated as "no rate"; combined with the
+  **preceding-working-day fallback** in `RateOn`, the nearest earlier published rate is used
+  and `Conversion.RateDate` records which date actually applied.
+- A best-effort fetcher/updater can come later as a *separate* concern, kept out of the
+  core path so a broken upstream never blocks report generation.
 
 This is the component most likely to need manual review by the user, so the report must
 show **the rate and date used for every converted figure** (audit trail), not just the
@@ -263,7 +267,10 @@ schedulefa generate \
   info. Year-constrained. Tolerant decode + flexible date parsing. Test in
   `internal/ibkr/ibkr_test.go` against `testdata/sample_flex.xml`; `generate` prints a
   parse summary.
-- **M2 — FX engine:** TTBR CSV store + preceding-working-day fallback + audit records.
+- **M2 — FX engine:** ✅ `fx.CSVStore` loads the community SBI FX RateKeeper format
+  (per-currency CSV; reads DATE + TT BUY; skips 0.00 non-publish days; latest-of-day wins).
+  `RateOn` does preceding-working-day fallback; `Convert` emits `Conversion` audit records.
+  Tested in `internal/fx/fx_test.go`.
 - **M3 — A3 (buy & hold):** closing value, initial value, dividends, proceeds in INR with
   approximate peak (mode C). End-to-end report for the simple case.
 - **M4 — Exact peak:** daily share reconstruction from trades + pluggable price provider

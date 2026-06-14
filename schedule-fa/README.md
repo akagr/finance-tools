@@ -10,10 +10,13 @@ challenges, locked decisions, architecture, and milestones.
 
 ## Status
 
-**M1 — IBKR ingest.** Parses a downloaded Activity Flex XML (account, open positions with
-lot detail, trades, dividends with withholding matched), constrained to the calendar year;
-`generate` prints a parse summary. Downstream stages (fx → peak → build → report) are still
-stubs. Tested against `internal/ibkr/testdata/sample_flex.xml`.
+- **M1 — IBKR ingest** ✅ — parses a downloaded Activity Flex XML (account, open positions
+  with lot detail, trades, dividends with withholding matched), constrained to the calendar
+  year. `generate` prints a parse summary.
+- **M2 — FX engine** ✅ — `fx.CSVStore` reads the community SBI FX RateKeeper format and
+  converts to INR with preceding-working-day fallback and per-figure audit records.
+
+Next: M3 wires ingest + fx + (approximate) peak into actual Table A3 rows and renders them.
 
 ## Usage (target)
 

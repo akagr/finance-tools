@@ -1,19 +1,37 @@
 # SBI TTBR rate data
 
-Bundled SBI **TT Buying Rate** history, one CSV per currency (or a combined file).
-Used by `internal/fx` (M2) with preceding-working-day fallback for missing dates.
+The `fx` package reads SBI **TT Buying Rate** history in the community
+**[SBI FX RateKeeper](https://github.com/sahilgupta/sbi-fx-ratekeeper)** format — one CSV
+per currency, with the currency in the filename:
 
-Expected columns (header required):
-
-```csv
-date,currency,inr_per_unit
-2024-12-31,USD,85.55
-2024-12-30,USD,85.40
+```
+SBI_REFERENCE_RATES_USD.csv
+SBI_REFERENCE_RATES_EUR.csv
 ```
 
-- `date` — `YYYY-MM-DD`, the date the rate was published for.
-- `currency` — ISO-4217, e.g. `USD`.
-- `inr_per_unit` — INR per 1 unit of the currency (decimal).
+Columns (only `DATE` and `TT BUY` are used; others are ignored):
 
-Users can extend or override with `--rates <file.csv>`. There is no official free SBI
-TTBR API, so these are curated/curatable data files, not fetched at runtime.
+```csv
+DATE,PDF FILE,TT BUY,TT SELL,BILL BUY,BILL SELL,FOREX TRAVEL CARD BUY,FOREX TRAVEL CARD SELL,CN BUY,CN SELL
+2024-12-31 09:00,https://.../2024-12-31.pdf,85.55,86.40,85.49,86.55,85.05,86.75,84.75,86.95
+```
+
+- `DATE` — `YYYY-MM-DD HH:MM` (date-only `YYYY-MM-DD` also accepted).
+- `TT BUY` — INR per 1 unit of the currency. A value of `0.00` means SBI did not
+  publish that day; such rows are **skipped**, so the preceding-working-day fallback applies.
+- If a date has multiple rows (intraday revisions), the **last** one wins.
+
+## Getting the data
+
+There is no free official SBI TTBR API. Download the per-currency CSVs from the RateKeeper
+repo (or a fork) into this directory:
+
+```sh
+curl -L -o data/ttbr/SBI_REFERENCE_RATES_USD.csv \
+  https://raw.githubusercontent.com/sahilgupta/sbi-fx-ratekeeper/main/csv_files/SBI_REFERENCE_RATES_USD.csv
+```
+
+The data is **not bundled** in the repo (it is third-party and updated daily). Load a whole
+directory with `fx.LoadRateKeeperDir(dir)` or a single file with
+`(*CSVStore).LoadRateKeeperFile(cur, path)`; the `--rates` CLI flag (wired in M3) points at
+either. Coverage starts ~Jan 2020.
