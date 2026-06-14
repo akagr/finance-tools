@@ -19,11 +19,15 @@ stubs. Tested against `internal/ibkr/testdata/sample_flex.xml`.
 
 ```sh
 schedulefa generate \
-  --year 2024 \                 # CALENDAR year (Jan 1 – Dec 31), enforced
-  --statement statement.xml \   # IBKR Activity Flex Query, XML output (offline mode)
-  --rates data/ttbr/usd.csv \   # optional SBI TTBR override
+  --year 2024 \                          # CALENDAR year (Jan 1 – Dec 31), enforced
+  --statement private/flex-2024.xml \    # IBKR Activity Flex Query, XML output (offline mode)
+  --rates data/ttbr/usd.csv \            # optional SBI TTBR override
   --out ./report --format md,csv,json
 ```
+
+> Keep real Flex exports under `private/` (gitignored) — they contain your account
+> number, address, and holdings and must never be committed. For a full Schedule FA you
+> want a **complete past calendar year** (e.g. a Jan 1–Dec 31 export), not a year-to-date one.
 
 ## Build
 

@@ -11,9 +11,13 @@ vendor/
 .idea/
 .vscode/
 
-# Sensitive — never commit real broker data, tokens, or generated reports
+# Sensitive — never commit real broker data, tokens, or generated reports.
+# Real Flex exports contain account numbers, addresses, and holdings.
+private/            # local-only real statements / fixtures
 *.flex.xml
 statement*.xml
+Schedule_FA*.xml
+flex-*.xml
 /report/
 *.token
 secrets.*
