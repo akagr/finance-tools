@@ -10,8 +10,10 @@ challenges, locked decisions, architecture, and milestones.
 
 ## Status
 
-**M0 — skeleton.** CLI scaffold + domain model + package stubs compile; report generation
-is not implemented yet (the `generate` command prints what it *will* do and exits).
+**M1 — IBKR ingest.** Parses a downloaded Activity Flex XML (account, open positions with
+lot detail, trades, dividends with withholding matched), constrained to the calendar year;
+`generate` prints a parse summary. Downstream stages (fx → peak → build → report) are still
+stubs. Tested against `internal/ibkr/testdata/sample_flex.xml`.
 
 ## Usage (target)
 

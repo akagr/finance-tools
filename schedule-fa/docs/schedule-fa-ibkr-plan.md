@@ -257,9 +257,12 @@ schedulefa generate \
 
 ## 8. Milestones
 
-- **M0 — Skeleton:** repo, CLI scaffold, domain model, disclaimers. *(this doc + go module)*
-- **M1 — IBKR ingest:** parse a downloaded Activity Flex **XML** (offline mode first):
-  positions, trades, dividends, account, instrument info. Golden-file tests on a sample.
+- **M0 — Skeleton:** ✅ repo, CLI scaffold, domain model, disclaimers.
+- **M1 — IBKR ingest:** ✅ parse a downloaded Activity Flex **XML** (offline): account,
+  open positions (+ lot detail), trades, dividends (with withholding matched), securities
+  info. Year-constrained. Tolerant decode + flexible date parsing. Test in
+  `internal/ibkr/ibkr_test.go` against `testdata/sample_flex.xml`; `generate` prints a
+  parse summary.
 - **M2 — FX engine:** TTBR CSV store + preceding-working-day fallback + audit records.
 - **M3 — A3 (buy & hold):** closing value, initial value, dividends, proceeds in INR with
   approximate peak (mode C). End-to-end report for the simple case.

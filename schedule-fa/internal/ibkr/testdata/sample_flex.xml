@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexQueryResponse queryName="ScheduleFA" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1234567" fromDate="20240101" toDate="20241231" period="Year2024" whenGenerated="20250115;120000">
+      <AccountInformation accountId="U1234567" name="Jane Doe" currency="USD" dateOpened="20210510"/>
+      <SecuritiesInfo>
+        <SecurityInfo symbol="AAPL" isin="US0378331005" description="APPLE INC" assetCategory="STK" currency="USD" issuerCountryCode="US"/>
+        <SecurityInfo symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" assetCategory="ETF" currency="USD" issuerCountryCode="US"/>
+        <SecurityInfo symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" assetCategory="STK" currency="USD" issuerCountryCode="US"/>
+      </SecuritiesInfo>
+      <OpenPositions>
+        <OpenPosition accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" position="100" markPrice="250.00" costBasisPrice="150.00" costBasisMoney="15000.00" openDateTime="20230110;120000" holdingPeriodDateTime="20230110;120000" issuerCountryCode="US">
+          <Lot position="60" costBasisMoney="9000.00" openDateTime="20230110;120000"/>
+          <Lot position="40" costBasisMoney="6000.00" openDateTime="20240315;120000"/>
+        </OpenPosition>
+        <OpenPosition accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" position="10" markPrice="540.00" costBasisPrice="500.00" costBasisMoney="5000.00" openDateTime="20240620;120000" holdingPeriodDateTime="20240620;120000" issuerCountryCode="US"/>
+      </OpenPositions>
+      <Trades>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" tradeDate="20240315" buySell="BUY" quantity="40" tradePrice="150.00" proceeds="-6000.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" tradeDate="20240620" buySell="BUY" quantity="10" tradePrice="500.00" proceeds="-5000.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240201" buySell="BUY" quantity="20" tradePrice="400.00" proceeds="-8000.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240901" buySell="SELL" quantity="20" tradePrice="450.00" proceeds="9000.00" ibCommission="-1.00" issuerCountryCode="US"/>
+      </Trades>
+      <CashTransactions>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND" currency="USD" amount="25.00" dateTime="20240613"/>
+        <CashTransaction accountId="U1234567" type="Withholding Tax" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND - US TAX" currency="USD" amount="-6.25" dateTime="20240613"/>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="VOO" isin="US9229083632" description="VOO CASH DIVIDEND" currency="USD" amount="15.00" dateTime="20240925"/>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="OUT OF RANGE DIVIDEND" currency="USD" amount="99.00" dateTime="20250102"/>
+      </CashTransactions>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/akagr/tax-tools/schedule-fa/internal/ibkr"
 )
 
 const disclaimer = "NOTE: not tax advice. Output is a working draft to verify before filing."
@@ -79,18 +81,27 @@ func cmdGenerate(args []string) int {
 		return 1
 	}
 
-	// M0: validation passes; the pipeline below is not implemented yet.
-	fmt.Printf("schedulefa: would generate Schedule FA for calendar year %d\n", *year)
-	fmt.Printf("  reporting period : %d-01-01 to %d-12-31\n", *year, *year)
-	fmt.Printf("  statement        : %s\n", *statement)
+	fmt.Printf("schedulefa: Schedule FA for calendar year %d (%d-01-01 to %d-12-31)\n", *year, *year, *year)
+
+	// M1: parse the IBKR Flex XML and summarize. Downstream stages follow.
+	st, err := ibkr.ParseFlexFile(*statement, *year)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Printf("  account          : %s (%s), base %s\n", st.Account.Number, st.Account.Name, st.Account.BaseCurrency)
+	fmt.Printf("  open positions   : %d (year-end snapshot)\n", len(st.OpenPositions))
+	fmt.Printf("  lots             : %d\n", len(st.Lots))
+	fmt.Printf("  trades           : %d\n", len(st.Trades))
+	fmt.Printf("  dividends        : %d\n", len(st.Dividends))
+
 	fmt.Printf("  rates            : %s\n", orDefault(*rates, "(bundled data/ttbr/*.csv)"))
 	fmt.Printf("  peak mode        : approximate (mode C) — exact (mode B) needs --prices (M4)\n")
 	if *prices != "" {
 		fmt.Printf("  prices           : %s\n", *prices)
 	}
 	fmt.Printf("  output           : %s  [%s]\n", *out, strings.ReplaceAll(*format, ",", ", "))
-	fmt.Println("  pipeline         : ibkr.ParseFlexXML → fx → peak.Compute → schedulefa.Build → report")
-	fmt.Fprintln(os.Stderr, "\nnot implemented yet (M0 scaffold). "+disclaimer)
+	fmt.Fprintln(os.Stderr, "\nparsed OK. Remaining pipeline (fx → peak → build → report) not implemented yet (M1). "+disclaimer)
 	return 1
 }
 
