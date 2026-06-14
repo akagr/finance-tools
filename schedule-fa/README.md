@@ -29,11 +29,21 @@ Next: M6 (Flex Web Service online pull), then M7 (HTML/PDF polish).
 ## Usage (target)
 
 ```sh
+# 1. SBI TTBR rates (see data/ttbr/README.md)
+curl -L -o data/ttbr/SBI_REFERENCE_RATES_USD.csv \
+  https://raw.githubusercontent.com/sahilgupta/sbi-fx-ratekeeper/main/csv_files/SBI_REFERENCE_RATES_USD.csv
+
+# 2. Daily prices for exact peak (edit scripts/tickers.txt first)
+scripts/fetch-prices.py 2026
+
+# 3. Generate (calendar year is enforced; output defaults under gitignored private/)
 schedulefa generate \
-  --year 2024 \                          # CALENDAR year (Jan 1 – Dec 31), enforced
-  --statement private/flex-2024.xml \    # IBKR Activity Flex Query, XML output (offline mode)
-  --rates data/ttbr/usd.csv \            # optional SBI TTBR override
-  --out private/report --format md,csv,json   # output defaults under gitignored private/
+  --year 2026 \
+  --statement private/flex-2026.xml \              # IBKR Activity Flex Query, XML
+  --rates data/ttbr/SBI_REFERENCE_RATES_USD.csv \
+  --prices data/prices/prices-2026.csv \           # omit for approximate peak (mode C)
+  --entities data/entities/entities.csv \          # address/ZIP/country-code overrides
+  --out private/report --format md,csv,json
 ```
 
 > Keep real Flex exports under `private/` (gitignored) — they contain your account

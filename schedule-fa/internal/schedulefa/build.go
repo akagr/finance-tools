@@ -273,7 +273,7 @@ func sumAmounts(amts []Amount) Amount {
 func institutionMeta(ibEntity string) (address, zip, countryName, itrCode string) {
 	switch strings.ToUpper(strings.TrimSpace(ibEntity)) {
 	case "", "IBLLC-US", "IBLLC":
-		return "One Pickwick Plaza, Greenwich, CT", "06830", "United States of America", "2"
+		return "One Pickwick Plaza, Greenwich, CT", "06830", "United States of America", "1"
 	default:
 		return "", "", "", ""
 	}
@@ -388,18 +388,36 @@ func concatErrs(groups ...[]error) []error {
 	return out
 }
 
-// countryFor maps an ISO-2 country code to (name, ITR country code). The ITR
-// codes differ from ISO; only the common ones are mapped here, the rest are
-// flagged for manual entry.
-func countryFor(iso string) (name, itrCode string) {
-	switch strings.ToUpper(iso) {
-	case "US", "USA":
-		return "United States of America", "2"
-	case "":
+// isdCountries maps an ISO-3166 alpha-2 (or common 3-letter) code to (display
+// name, ISD telephone code). Schedule FA uses the country's ISD code as its
+// "country code". Only common ones are mapped; the rest are flagged for manual
+// entry (set via --entities).
+var isdCountries = map[string][2]string{
+	"US":  {"United States of America", "1"},
+	"USA": {"United States of America", "1"},
+	"IE":  {"Ireland", "353"},
+	"GB":  {"United Kingdom", "44"},
+	"UK":  {"United Kingdom", "44"},
+	"CA":  {"Canada", "1"},
+	"AU":  {"Australia", "61"},
+	"DE":  {"Germany", "49"},
+	"NL":  {"Netherlands", "31"},
+	"FR":  {"France", "33"},
+	"CH":  {"Switzerland", "41"},
+	"SG":  {"Singapore", "65"},
+	"JP":  {"Japan", "81"},
+	"HK":  {"Hong Kong", "852"},
+	"LU":  {"Luxembourg", "352"},
+}
+
+func countryFor(iso string) (name, code string) {
+	if iso == "" {
 		return "", ""
-	default:
-		return iso, "" // name unknown-ish; ITR code must be filled manually
 	}
+	if v, ok := isdCountries[strings.ToUpper(iso)]; ok {
+		return v[0], v[1]
+	}
+	return iso, "" // ISD code must be filled manually
 }
 
 func natureOf(assetClass string) string {

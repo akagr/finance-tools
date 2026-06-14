@@ -94,37 +94,84 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 			return in
 		}
 
-		// Open positions → year-end snapshot + first-cut lots.
+		// Open positions. IBKR may emit several rows per instrument: a SUMMARY
+		// row plus one LOT row per tax lot (or several LOT rows with no summary).
+		// We aggregate them into a single year-end Position and one Lot per LOT
+		// row, so positions are never double-counted nor under-counted.
+		type posGroup struct {
+			inst model.Instrument
+			rows []flexOpenPosition
+		}
+		posByKey := map[string]*posGroup{}
+		var posOrder []string
 		for _, p := range st.OpenPositions.Positions {
 			inst := mergeInst(model.Instrument{
 				Symbol: p.Symbol, ISIN: p.ISIN, Name: p.Description,
 				AssetClass: p.AssetCategory, ListingCtry: p.IssuerCountryCode,
 				Currency: model.Currency(p.Currency),
 			})
-			out.OpenPositions = append(out.OpenPositions, model.Position{
-				Instrument: inst,
-				Date:       yearEnd,
-				Quantity:   parseRat(p.Position),
-				MarkPrice:  money(p.Currency, p.MarkPrice),
-			})
-			// Lots: nested <Lot> if lot detail was enabled, else the aggregate.
-			if len(p.Lots) > 0 {
-				for _, l := range p.Lots {
-					out.Lots = append(out.Lots, model.Lot{
-						Instrument: inst,
-						OpenDate:   mustDate(firstNonEmpty(l.OpenDateTime, l.HoldingPeriodDateTime)),
-						VestDate:   mustDate(l.VestingDate),
-						Quantity:   parseRat(l.Position),
-						CostBasis:  money(p.Currency, l.CostBasisMoney),
-					})
+			k := instKey(p.ISIN, p.Symbol)
+			g := posByKey[k]
+			if g == nil {
+				g = &posGroup{inst: inst}
+				posByKey[k] = g
+				posOrder = append(posOrder, k)
+			}
+			g.rows = append(g.rows, p)
+		}
+		for _, k := range posOrder {
+			g := posByKey[k]
+			var summaries, lotRows []flexOpenPosition
+			for _, r := range g.rows {
+				if strings.EqualFold(r.LevelOfDetail, "SUMMARY") {
+					summaries = append(summaries, r)
+				} else {
+					lotRows = append(lotRows, r)
 				}
-			} else {
+			}
+			// Position quantity: prefer LOT rows (summed); fall back to SUMMARY.
+			posBase := lotRows
+			if len(posBase) == 0 {
+				posBase = summaries
+			}
+			qty := new(big.Rat)
+			var mark model.Money
+			for _, r := range posBase {
+				qty.Add(qty, parseRat(r.Position))
+				if strings.TrimSpace(r.MarkPrice) != "" {
+					mark = money(r.Currency, r.MarkPrice)
+				}
+			}
+			out.OpenPositions = append(out.OpenPositions, model.Position{
+				Instrument: g.inst,
+				Date:       yearEnd,
+				Quantity:   qty,
+				MarkPrice:  mark,
+			})
+			// Lots: one per LOT row (or nested <Lot>); fall back to SUMMARY rows.
+			lotBase := lotRows
+			if len(lotBase) == 0 {
+				lotBase = summaries
+			}
+			for _, r := range lotBase {
+				if len(r.Lots) > 0 {
+					for _, l := range r.Lots {
+						out.Lots = append(out.Lots, model.Lot{
+							Instrument: g.inst,
+							OpenDate:   mustDate(firstNonEmpty(l.HoldingPeriodDateTime, l.OpenDateTime)),
+							VestDate:   mustDate(l.VestingDate),
+							Quantity:   parseRat(l.Position),
+							CostBasis:  money(r.Currency, l.CostBasisMoney),
+						})
+					}
+					continue
+				}
 				out.Lots = append(out.Lots, model.Lot{
-					Instrument: inst,
-					OpenDate:   mustDate(firstNonEmpty(p.OpenDateTime, p.HoldingPeriodDateTime)),
-					VestDate:   mustDate(p.VestingDate),
-					Quantity:   parseRat(p.Position),
-					CostBasis:  money(p.Currency, p.CostBasisMoney),
+					Instrument: g.inst,
+					OpenDate:   mustDate(firstNonEmpty(r.HoldingPeriodDateTime, r.OpenDateTime)),
+					VestDate:   mustDate(r.VestingDate),
+					Quantity:   parseRat(r.Position),
+					CostBasis:  money(r.Currency, r.CostBasisMoney),
 				})
 			}
 		}
@@ -287,6 +334,7 @@ type flexOpenPosition struct {
 	HoldingPeriodDateTime string    `xml:"holdingPeriodDateTime,attr"`
 	VestingDate           string    `xml:"vestingDate,attr"`
 	IssuerCountryCode     string    `xml:"issuerCountryCode,attr"`
+	LevelOfDetail         string    `xml:"levelOfDetail,attr"`
 	Lots                  []flexLot `xml:"Lot"`
 }
 

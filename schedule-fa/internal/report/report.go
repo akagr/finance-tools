@@ -27,7 +27,7 @@ const (
 )
 
 const disclaimer = "Not tax advice. A working draft to verify before filing. " +
-	"Schedule FA covers the CALENDAR year; peak values are approximate (mode C)."
+	"Schedule FA covers the CALENDAR year; see the audit trail for every figure."
 
 // Renderer writes a report in one format.
 type Renderer interface {

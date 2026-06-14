@@ -57,7 +57,7 @@ func TestBuildA3(t *testing.T) {
 	}{
 		{"entity", row.EntityName, "Alpha Inc"},
 		{"country", row.CountryName, "United States of America"},
-		{"country code", row.CountryCode, "2"},
+		{"country code", row.CountryCode, "1"}, // ISD code for the US
 		{"nature", row.NatureEntity, "Listed equity share"},
 		{"acquired", row.AcquiredOn, "2024-03-15"},
 		{"initial", row.InitialValue.INR.Amount.RatString(), "80000"},  // 1000 * 80
@@ -89,14 +89,15 @@ func TestBuildA3(t *testing.T) {
 	}
 }
 
-func TestBuildEntitiesOverrideAndRSU(t *testing.T) {
+func TestBuildEntitiesOverrideAndAcquisitionDate(t *testing.T) {
 	inst := model.Instrument{Symbol: "AAA", ISIN: "X1", Name: "Alpha Inc", AssetClass: "STK", ListingCtry: "US", Currency: model.USD}
 	yearEnd := day(2024, 12, 31)
 	st := &model.Statement{
 		Year:          2024,
 		OpenPositions: []model.Position{{Instrument: inst, Date: yearEnd, Quantity: big.NewRat(10, 1), MarkPrice: usd(150)}},
-		// RSU lot: acquisition date is the vesting date, not the open date.
-		Lots: []model.Lot{{Instrument: inst, OpenDate: day(2024, 1, 1), VestDate: day(2024, 5, 20), Quantity: big.NewRat(10, 1), CostBasis: usd(1000)}},
+		// Acquisition = holding-period/open date. A FUTURE vesting date (IBKR
+		// forward lock-up) must NOT be used as the acquisition date.
+		Lots: []model.Lot{{Instrument: inst, OpenDate: day(2024, 5, 20), VestDate: day(2027, 4, 13), Quantity: big.NewRat(10, 1), CostBasis: usd(1000)}},
 	}
 
 	// Entity metadata fills address/ZIP/nature so the row needs no review.
@@ -120,7 +121,7 @@ func TestBuildEntitiesOverrideAndRSU(t *testing.T) {
 		t.Errorf("entity override not applied: %+v", row)
 	}
 	if row.AcquiredOn != "2024-05-20" {
-		t.Errorf("acquired = %q, want RSU vesting date 2024-05-20", row.AcquiredOn)
+		t.Errorf("acquired = %q, want holding-period date 2024-05-20 (not the future vest date)", row.AcquiredOn)
 	}
 	if row.NeedsReview {
 		t.Errorf("row should not need review once metadata is complete: %q", row.ReviewNote)

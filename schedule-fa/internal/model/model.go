@@ -74,13 +74,15 @@ type Lot struct {
 	CostBasis  Money // total cost in trade currency at acquisition
 }
 
-// AcquiredOn is the date the interest was acquired: the vesting date for RSUs,
-// otherwise the lot open date.
+// AcquiredOn is the date the interest was acquired — the holding-period / open
+// date (which, for vested RSUs, IBKR already reports as the vesting date). A
+// separate VestDate field is only used as a fallback when OpenDate is absent,
+// and never when it is in the future (IBKR uses it for forward lock-up dates).
 func (l Lot) AcquiredOn() time.Time {
-	if !l.VestDate.IsZero() {
-		return l.VestDate
+	if !l.OpenDate.IsZero() {
+		return l.OpenDate
 	}
-	return l.OpenDate
+	return l.VestDate
 }
 
 // Dividend is a cash distribution. Schedule FA wants the GROSS figure; the US

@@ -20,8 +20,19 @@ held, *and* the SBI TTBR must exist for those days; otherwise that day is skippe
 security's peak is marked approximate, and the Table A2 peak falls back to the upper-bound
 sum (the run reports this).
 
-Sources: any daily-close provider (e.g. Yahoo Finance / Stooq per-ticker history). Price
-files are **not vendored** and are gitignored — they can be large and are user-specific.
+## Fetching
+
+Use the helper, which pulls from the Yahoo Finance chart API (no key) and writes this format:
+
+```sh
+scripts/fetch-prices.py <year>            # reads scripts/tickers.txt
+```
+
+Edit `scripts/tickers.txt` (one line per holding: `symbol  yahoo-symbol  isin  [currency]`).
+Yahoo symbols: US tickers are plain (e.g. `IBKR`); LSE uses `.L` (e.g. `VWRA.L`, the USD
+line — `VWRP.L` is the GBP line). The script writes the **raw** close (not adjusted).
+
+Price files are **not vendored** and are gitignored — they can be large and are user-specific.
 
 > Splits/mergers: the position series is reconstructed from trades and is **not**
 > split-adjusted, so a corporate action in the year makes the pre-action peak unreliable —

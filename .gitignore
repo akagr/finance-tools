@@ -5,6 +5,8 @@
 *.test
 *.prof
 vendor/
+# compiled CLI binary (built into the module dir by `go build`)
+schedule-fa/schedulefa
 
 # Editor / OS
 .DS_Store
@@ -12,15 +14,15 @@ vendor/
 .vscode/
 
 # Sensitive — never commit real broker data, tokens, or generated reports.
-# Real Flex exports contain account numbers, addresses, and holdings.
-private/            # local-only real statements / fixtures
+# Real Flex exports and generated reports contain account numbers and holdings.
+# NOTE: gitignore does NOT support inline comments — keep comments on their own line.
+private/
 *.flex.xml
 statement*.xml
 Schedule_FA*.xml
 flex-*.xml
 *.token
 secrets.*
-# Generated reports default to private/ (above) — real ones contain holdings.
 
 # Third-party / user data (not vendored — see each dir's README)
 schedule-fa/data/ttbr/*.csv

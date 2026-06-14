@@ -65,6 +65,21 @@ func ComputeExact(s *model.Statement, store fx.Store, prices PriceProvider) (sec
 	jan1 := time.Date(s.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
 	dec31 := time.Date(s.Year, time.December, 31, 0, 0, 0, 0, time.UTC)
 
+	// Earliest acquisition date per instrument (from lots): a holding acquired
+	// mid-year via a non-trade event (reward, transfer-in) cannot be unwound from
+	// trades, so we must not value it before it was actually held.
+	acquired := map[string]time.Time{}
+	for _, l := range s.Lots {
+		k := instKey(l.Instrument)
+		a := l.AcquiredOn()
+		if a.IsZero() {
+			continue
+		}
+		if e, ok := acquired[k]; !ok || a.Before(e) {
+			acquired[k] = a
+		}
+	}
+
 	type state struct {
 		pos     *big.Rat
 		ti      int
@@ -92,6 +107,9 @@ func ComputeExact(s *model.Statement, store fx.Store, prices PriceProvider) (sec
 			}
 			if st.pos.Sign() <= 0 {
 				continue
+			}
+			if a, ok := acquired[k]; ok && d.Before(a) {
+				continue // not yet held on this day
 			}
 			dayHeld = true
 			price, err := prices.PriceOn(h.inst, d)

@@ -42,9 +42,17 @@ func TestParseFlexFile(t *testing.T) {
 		t.Errorf("unexpected corporate action: %+v", ca)
 	}
 
-	// Two open positions (AAPL, VOO); MSFT was fully exited intra-year.
+	// Two open positions (AAPL, VOO); MSFT was fully exited intra-year. VOO's two
+	// LOT rows must aggregate into one position of 10 shares with two lots.
 	if len(st.OpenPositions) != 2 {
-		t.Fatalf("open positions = %d, want 2", len(st.OpenPositions))
+		t.Fatalf("open positions = %d, want 2 (VOO lots must aggregate)", len(st.OpenPositions))
+	}
+	voo := findPosition(t, st, "VOO")
+	if !ratEq(voo.Quantity, big.NewRat(10, 1)) {
+		t.Errorf("VOO aggregated position = %s, want 10", voo.Quantity.RatString())
+	}
+	if n := len(lotsFor(st, "VOO")); n != 2 {
+		t.Errorf("VOO lots = %d, want 2", n)
 	}
 
 	// AAPL closing value = 100 * 250 = 25000 USD.

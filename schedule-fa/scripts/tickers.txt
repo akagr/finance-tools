@@ -1,0 +1,9 @@
+# Holdings to fetch daily prices for. One per line:
+#   <symbol>  <yahoo-symbol>  <isin>          [currency]
+# Lines starting with # are ignored. Currency defaults to USD.
+#
+# Yahoo symbol hints: US stocks use the plain ticker (IBKR); LSE uses ".L".
+# VWRA.L is the USD line on the London Stock Exchange (VWRP.L is the GBP line).
+
+IBKR  IBKR    US45841N1072  USD
+VWRA  VWRA.L  IE00BK5BQT80  USD

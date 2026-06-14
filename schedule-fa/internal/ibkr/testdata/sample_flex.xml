@@ -13,7 +13,8 @@
           <Lot position="60" costBasisMoney="9000.00" openDateTime="20230110;120000"/>
           <Lot position="40" costBasisMoney="6000.00" openDateTime="20240315;120000"/>
         </OpenPosition>
-        <OpenPosition accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" position="10" markPrice="540.00" costBasisPrice="500.00" costBasisMoney="5000.00" openDateTime="20240620;120000" holdingPeriodDateTime="20240620;120000" issuerCountryCode="US"/>
+        <OpenPosition accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" position="7" markPrice="540.00" costBasisPrice="500.00" costBasisMoney="3500.00" openDateTime="20240620;120000" holdingPeriodDateTime="20240620;120000" issuerCountryCode="US" levelOfDetail="LOT"/>
+        <OpenPosition accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" position="3" markPrice="540.00" costBasisPrice="500.00" costBasisMoney="1500.00" openDateTime="20240815;120000" holdingPeriodDateTime="20240815;120000" issuerCountryCode="US" levelOfDetail="LOT"/>
       </OpenPositions>
       <Trades>
         <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" tradeDate="20240315" buySell="BUY" quantity="40" tradePrice="150.00" proceeds="-6000.00" ibCommission="-1.00" issuerCountryCode="US"/>
