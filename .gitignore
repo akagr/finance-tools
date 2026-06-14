@@ -1,0 +1,19 @@
+# Go
+/bin/
+*.exe
+*.out
+*.test
+*.prof
+vendor/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Sensitive — never commit real broker data, tokens, or generated reports
+*.flex.xml
+statement*.xml
+/report/
+*.token
+secrets.*
