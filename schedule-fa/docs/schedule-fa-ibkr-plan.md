@@ -289,7 +289,10 @@ schedulefa generate \
   (SendRequest → poll GetStatement, handling the 1019 "generating" code). `generate`
   accepts `--flex-token` + `--flex-query` (with `--save-statement` to keep the raw XML).
   Tested with an httptest fake server (poll-then-success, error, missing-creds).
-- **M7 — Renderers & UX:** HTML/PDF, reconciliation summary, README, sample data.
+- **M7 — Renderers & UX:** ✅ printable self-contained HTML renderer (`--format html`;
+  Print → Save as PDF), sharing a view model with JSON. Reconciliation summary in md/html.
+  Fool-proof IBKR setup guide (Flex Query, Query ID, token) in the README. PDF is via the
+  browser's print-to-PDF, keeping the tool dependency-free.
 
 ---
 

@@ -80,6 +80,23 @@ func TestCSVRenderQuotesCommas(t *testing.T) {
 	}
 }
 
+func TestHTMLRender(t *testing.T) {
+	out := render(t, HTML, sampleReport())
+	for _, want := range []string{
+		"<!doctype html>", "Schedule FA — calendar year 2024",
+		"Table A2", "Table A3", "Audit trail", "Alpha, Inc",
+		"<span class=\"flag\">", "@media print",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("html missing %q", want)
+		}
+	}
+	// Entity name with a comma must be HTML-escaped contextually (no raw injection).
+	if strings.Contains(out, "<script") {
+		t.Error("unexpected raw script in output")
+	}
+}
+
 func TestMarkdownRenderAndWrite(t *testing.T) {
 	out := render(t, Markdown, sampleReport())
 	for _, want := range []string{"# Schedule FA — calendar year 2024", "Table A3", "Audit trail", "Reconciliation", "Alpha, Inc"} {

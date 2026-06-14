@@ -24,6 +24,7 @@ const (
 	Markdown Format = "md"
 	CSV      Format = "csv"
 	JSON     Format = "json"
+	HTML     Format = "html"
 )
 
 const disclaimer = "Not tax advice. A working draft to verify before filing. " +
@@ -43,6 +44,8 @@ func For(f Format) (Renderer, error) {
 		return csvRenderer{}, nil
 	case JSON:
 		return jsonRenderer{}, nil
+	case HTML:
+		return htmlRenderer{}, nil
 	default:
 		return nil, fmt.Errorf("report: unknown format %q", f)
 	}
@@ -245,6 +248,14 @@ type jsonAudit struct {
 }
 
 func (jsonRenderer) Render(w io.Writer, r *schedulefa.Report) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(buildView(r))
+}
+
+// buildView turns a report into the flat, pre-formatted view shared by the JSON
+// and HTML renderers.
+func buildView(r *schedulefa.Report) jsonReport {
 	out := jsonReport{Year: r.Year, Disclaimer: disclaimer}
 	for _, a := range r.A2 {
 		out.A2 = append(out.A2, jsonA2Row{
@@ -279,9 +290,7 @@ func (jsonRenderer) Render(w io.Writer, r *schedulefa.Report) error {
 		jr.Audit = append(jr.Audit, auditLines("Sale proceeds", row.SaleProceeds)...)
 		out.A3 = append(out.A3, jr)
 	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	return out
 }
 
 func auditLines(figure string, a schedulefa.Amount) []jsonAudit {

@@ -69,7 +69,7 @@ func cmdGenerate(args []string) int {
 		entitiesP = fs.String("entities", "data/entities", "entity metadata CSV file or dir (optional)")
 		pricesP   = fs.String("prices", "", "path to a daily prices CSV/dir (enables exact peak, mode B)")
 		out       = fs.String("out", "private/report", "output directory (default under gitignored private/)")
-		format    = fs.String("format", "md,csv,json", "comma-separated: md,csv,json")
+		format    = fs.String("format", "md,csv,json", "comma-separated: md,csv,json,html")
 	)
 	fs.Parse(args)
 
@@ -204,10 +204,10 @@ func parseFormats(s string) ([]report.Format, error) {
 			continue
 		}
 		switch report.Format(f) {
-		case report.Markdown, report.CSV, report.JSON:
+		case report.Markdown, report.CSV, report.JSON, report.HTML:
 			out = append(out, report.Format(f))
 		default:
-			return nil, fmt.Errorf("unknown --format %q (want md,csv,json)", f)
+			return nil, fmt.Errorf("unknown --format %q (want md,csv,json,html)", f)
 		}
 	}
 	if len(out) == 0 {
