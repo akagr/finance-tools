@@ -23,8 +23,10 @@ challenges, locked decisions, architecture, and milestones.
 - **M4 — Exact peak** ✅ — `--prices` enables mode B: daily share reconstruction valued
   against a daily price series (preceding-trading-day fallback) × TTBR, plus a **true Table
   A2 peak** (max daily NAV). Mode C remains the fallback when no prices are supplied.
+- **M6 — Flex Web Service** ✅ — `--flex-token` + `--flex-query` pull the statement online
+  (no manual XML download); `--save-statement` keeps a copy.
 
-Next: M6 (Flex Web Service online pull), then M7 (HTML/PDF polish).
+Next: M7 (HTML/PDF polish).
 
 ## Usage (target)
 
@@ -44,6 +46,16 @@ schedulefa generate \
   --prices data/prices/prices-2026.csv \           # omit for approximate peak (mode C)
   --entities data/entities/entities.csv \          # address/ZIP/country-code overrides
   --out private/report --format md,csv,json
+```
+
+Instead of `--statement`, pull the statement online from the IBKR **Flex Web Service**
+(create a token under Client Portal → Settings → Flex Web Service):
+
+```sh
+schedulefa generate --year 2026 \
+  --flex-token <token> --flex-query <activity-flex-query-id> \
+  --save-statement private/flex-2026.xml \         # optional: keep the raw XML
+  --rates data/ttbr/SBI_REFERENCE_RATES_USD.csv --prices data/prices/prices-2026.csv
 ```
 
 > Keep real Flex exports under `private/` (gitignored) — they contain your account

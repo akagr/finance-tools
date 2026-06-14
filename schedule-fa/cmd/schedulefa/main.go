@@ -1,19 +1,22 @@
 // Command schedulefa generates an Indian Schedule FA (Foreign Assets) report
-// from Interactive Brokers holdings.
-//
-// M0: CLI scaffold + flag validation only. The generate pipeline (parse →
-// fx → peak → build → render) is wired up in M1–M7.
+// from Interactive Brokers holdings. The generate pipeline is: ingest a Flex
+// statement (a saved XML or an online Flex Web Service pull) → convert with SBI
+// TTBR → compute peaks → build Tables A2/A3 → render md/csv/json.
 package main
 
 import (
+	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/akagr/tax-tools/schedule-fa/internal/entities"
 	"github.com/akagr/tax-tools/schedule-fa/internal/fx"
 	"github.com/akagr/tax-tools/schedule-fa/internal/ibkr"
+	"github.com/akagr/tax-tools/schedule-fa/internal/model"
 	"github.com/akagr/tax-tools/schedule-fa/internal/peak"
 	"github.com/akagr/tax-tools/schedule-fa/internal/prices"
 	"github.com/akagr/tax-tools/schedule-fa/internal/report"
@@ -31,7 +34,7 @@ func main() {
 	case "generate":
 		os.Exit(cmdGenerate(os.Args[2:]))
 	case "version":
-		fmt.Println("schedulefa 0.0.0 (M0 scaffold)")
+		fmt.Println("schedulefa 0.6.0")
 	case "-h", "--help", "help":
 		usage(os.Stdout)
 	default:
@@ -59,8 +62,9 @@ func cmdGenerate(args []string) int {
 	var (
 		year      = fs.Int("year", 0, "CALENDAR year to report (Jan 1 – Dec 31), e.g. 2024")
 		statement = fs.String("statement", "", "path to an IBKR Activity Flex Query XML export (offline mode)")
-		flexToken = fs.String("flex-token", "", "IBKR Flex Web Service token (online mode; M6)")
-		flexQuery = fs.String("flex-query", "", "IBKR Flex Query id (online mode; M6)")
+		flexToken = fs.String("flex-token", "", "IBKR Flex Web Service token (online mode)")
+		flexQuery = fs.String("flex-query", "", "IBKR Activity Flex Query id (online mode)")
+		saveStmt  = fs.String("save-statement", "", "when online, also save the fetched Flex XML to this path")
 		rates     = fs.String("rates", "", "path to an SBI TTBR rates CSV (overrides bundled)")
 		entitiesP = fs.String("entities", "data/entities", "entity metadata CSV file or dir (optional)")
 		pricesP   = fs.String("prices", "", "path to a daily prices CSV/dir (enables exact peak, mode B)")
@@ -80,21 +84,46 @@ func cmdGenerate(args []string) int {
 	}
 	online := *flexToken != "" || *flexQuery != ""
 	if *statement == "" && !online {
-		fmt.Fprintln(os.Stderr, "error: provide --statement <file.xml> (offline) or --flex-token/--flex-query (online, M6)")
+		fmt.Fprintln(os.Stderr, "error: provide --statement <file.xml> (offline) or --flex-token + --flex-query (online)")
 		return 2
 	}
-	if online {
-		fmt.Fprintln(os.Stderr, "error: Flex Web Service (online) ingest is not available until M6; use --statement for now")
-		return 1
+	if online && (*flexToken == "" || *flexQuery == "") {
+		fmt.Fprintln(os.Stderr, "error: online mode needs both --flex-token and --flex-query")
+		return 2
 	}
 
 	fmt.Printf("schedulefa: Schedule FA for calendar year %d (%d-01-01 to %d-12-31)\n", *year, *year, *year)
 
-	// M1: parse the IBKR Flex XML and summarize. Downstream stages follow.
-	st, err := ibkr.ParseFlexFile(*statement, *year)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+	// Ingest: pull from the Flex Web Service (online) or parse a saved XML.
+	var st *model.Statement
+	if online {
+		fmt.Printf("  source           : Flex Web Service (query %s)\n", *flexQuery)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		body, err := ibkr.NewFlexClient().Fetch(ctx, *flexToken, *flexQuery)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if *saveStmt != "" {
+			if err := os.WriteFile(*saveStmt, body, 0o600); err != nil {
+				fmt.Fprintf(os.Stderr, "error: saving statement to %q: %v\n", *saveStmt, err)
+				return 1
+			}
+			fmt.Printf("  saved statement  : %s\n", *saveStmt)
+		}
+		st, err = ibkr.ParseFlexXML(bytes.NewReader(body), *year)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	} else {
+		var err error
+		st, err = ibkr.ParseFlexFile(*statement, *year)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
 	}
 	fmt.Printf("  account          : %s (%s), base %s\n", st.Account.Number, st.Account.Name, st.Account.BaseCurrency)
 	fmt.Printf("  open positions   : %d (year-end snapshot)\n", len(st.OpenPositions))

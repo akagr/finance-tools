@@ -8,7 +8,7 @@ Each tool is an isolated Go module under its own directory, tied together by a r
 
 | Tool            | Directory                      | Status           | What it does                                                                                                                      |
 |-----------------|--------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| **schedule-fa** | [`schedule-fa/`](schedule-fa/) | M4 (exact peak) | Generates a ready-to-use **Schedule FA** (Foreign Assets) report for the Indian ITR from **Interactive Brokers (IBKR)** holdings. |
+| **schedule-fa** | [`schedule-fa/`](schedule-fa/) | M6 (online pull) | Generates a ready-to-use **Schedule FA** (Foreign Assets) report for the Indian ITR from **Interactive Brokers (IBKR)** holdings. |
 
 ## Layout
 

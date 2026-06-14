@@ -285,7 +285,10 @@ schedulefa generate \
   address/ZIP/country code/nature, via `--entities`); RSU vesting date as acquisition date;
   corporate-action parsing + review flags; richer AccountInformation (address, ibEntity).
   Review flags now trip only on real data gaps. A2 rendered in md/json.
-- **M6 — Flex Web Service:** online pull (SendRequest/GetStatement, polling).
+- **M6 — Flex Web Service:** ✅ `ibkr.FlexClient` does the online pull
+  (SendRequest → poll GetStatement, handling the 1019 "generating" code). `generate`
+  accepts `--flex-token` + `--flex-query` (with `--save-statement` to keep the raw XML).
+  Tested with an httptest fake server (poll-then-success, error, missing-creds).
 - **M7 — Renderers & UX:** HTML/PDF, reconciliation summary, README, sample data.
 
 ---
