@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/akagr/tax-tools/schedule-fa/internal/entities"
 	"github.com/akagr/tax-tools/schedule-fa/internal/fx"
 	"github.com/akagr/tax-tools/schedule-fa/internal/ibkr"
 	"github.com/akagr/tax-tools/schedule-fa/internal/peak"
@@ -60,6 +61,7 @@ func cmdGenerate(args []string) int {
 		flexToken = fs.String("flex-token", "", "IBKR Flex Web Service token (online mode; M6)")
 		flexQuery = fs.String("flex-query", "", "IBKR Flex Query id (online mode; M6)")
 		rates     = fs.String("rates", "", "path to an SBI TTBR rates CSV (overrides bundled)")
+		entitiesP = fs.String("entities", "data/entities", "entity metadata CSV file or dir (optional)")
 		prices    = fs.String("prices", "", "path to a daily prices CSV (enables exact peak; M4)")
 		out       = fs.String("out", "private/report", "output directory (default under gitignored private/)")
 		format    = fs.String("format", "md,csv,json", "comma-separated: md,csv,json")
@@ -117,7 +119,12 @@ func cmdGenerate(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: computing peak values: %v\n", err)
 		return 1
 	}
-	rep, err := schedulefa.Build(st, store, peaks)
+	ents, err := entities.Load(*entitiesP)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: loading entity metadata from %q: %v\n", *entitiesP, err)
+		return 1
+	}
+	rep, err := schedulefa.Build(st, store, peaks, ents)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: building report: %v\n", err)
 		return 1

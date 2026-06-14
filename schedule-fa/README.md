@@ -17,9 +17,12 @@ challenges, locked decisions, architecture, and milestones.
   converts to INR with preceding-working-day fallback and per-figure audit records.
 - **M3 — Table A3 + reports** ✅ — approximate peak (mode C) + row builder produce Table A3
   (initial/peak/closing/dividend/proceeds in INR, audit trail, review flags), rendered to
-  **Markdown, CSV, and JSON**. `generate` now runs the full pipeline and writes the report.
+  **Markdown, CSV, and JSON**. `generate` runs the full pipeline and writes the report.
+- **M5 — Table A2 + edge cases** ✅ — custodial-account row (aggregated, flagged peak),
+  `--entities` metadata override (address/ZIP/country code/nature), RSU vesting dates, and
+  corporate-action review flags.
 
-Next: M4 (exact peak from daily prices), then M5 (Table A2 + entity metadata + edge cases).
+Next: M4 (exact peak from a daily price series), then M6 (Flex Web Service online pull).
 
 ## Usage (target)
 

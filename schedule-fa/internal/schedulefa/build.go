@@ -14,11 +14,13 @@
 package schedulefa
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/akagr/tax-tools/schedule-fa/internal/entities"
 	"github.com/akagr/tax-tools/schedule-fa/internal/fx"
 	"github.com/akagr/tax-tools/schedule-fa/internal/model"
 	"github.com/akagr/tax-tools/schedule-fa/internal/peak"
@@ -61,6 +63,8 @@ type A2Row struct {
 	PeakBalance    Amount
 	ClosingBalance Amount
 	GrossCredited  Amount
+	NeedsReview    bool
+	ReviewNote     string
 }
 
 // Report is the complete Schedule FA output for one calendar year.
@@ -75,14 +79,20 @@ type valuedEvent struct {
 	Date  time.Time
 }
 
-// Build assembles Table A3 from the statement, FX store, and computed peaks.
-func Build(s *model.Statement, store fx.Store, peaks []peak.Result) (*Report, error) {
+// Build assembles Tables A2 and A3 from the statement, FX store, computed peaks,
+// and optional user-supplied entity metadata (ents may be nil).
+func Build(s *model.Statement, store fx.Store, peaks []peak.Result, ents *entities.Store) (*Report, error) {
 	rep := &Report{Year: s.Year}
 	yearEnd := time.Date(s.Year, time.December, 31, 0, 0, 0, 0, time.UTC)
 
 	peakByKey := map[string]peak.Result{}
 	for _, p := range peaks {
 		peakByKey[instKey(p.Instrument)] = p
+	}
+	corpActions := map[string][]model.CorporateAction{}
+	for _, ca := range s.CorporateActions {
+		k := instKey(ca.Instrument)
+		corpActions[k] = append(corpActions[k], ca)
 	}
 
 	// Every instrument held at any time during the year: positions ∪ trades.
@@ -112,13 +122,22 @@ func Build(s *model.Statement, store fx.Store, peaks []peak.Result) (*Report, er
 		}
 		row.CountryName, row.CountryCode = countryFor(inst.ListingCtry)
 
-		// Initial value + acquisition date.
+		// User-supplied entity metadata overrides the IBKR-derived defaults.
+		if e, ok := ents.Lookup(inst.ISIN, inst.Symbol); ok {
+			row.EntityName = firstNonEmpty(e.Name, row.EntityName)
+			row.Address = firstNonEmpty(e.Address, row.Address)
+			row.ZIP = firstNonEmpty(e.ZIP, row.ZIP)
+			row.CountryCode = firstNonEmpty(e.CountryCode, row.CountryCode)
+			row.NatureEntity = firstNonEmpty(e.Nature, row.NatureEntity)
+		}
+
+		// Initial value + acquisition date (vesting date for RSUs).
 		var initEvents []valuedEvent
 		var acq time.Time
 		if lots := lotsFor(s, k); len(lots) > 0 {
 			for _, l := range lots {
-				initEvents = append(initEvents, valuedEvent{l.CostBasis, l.OpenDate})
-				acq = earliest(acq, l.OpenDate)
+				initEvents = append(initEvents, valuedEvent{l.CostBasis, l.AcquiredOn()})
+				acq = earliest(acq, l.AcquiredOn())
 			}
 		} else {
 			for _, t := range tradesFor(s, k) {
@@ -167,24 +186,83 @@ func Build(s *model.Statement, store fx.Store, peaks []peak.Result) (*Report, er
 		procAmt, procErrs := convertEvents(store, procEvents)
 		row.SaleProceeds = procAmt
 
-		// Review flags — Mode C peaks always warrant a glance.
-		notes := []string{"peak is approximate (mode C)"}
+		// Review flags — only real data gaps trip NeedsReview. The mode-C peak
+		// caveat is conveyed once, in the report header, not per row.
+		var notes []string
 		if row.CountryCode == "" {
-			notes = append(notes, "country code unknown")
+			notes = append(notes, "country code unknown (set via --entities)")
 		}
 		if row.Address == "" || row.ZIP == "" {
-			notes = append(notes, "entity address/ZIP missing (add via data/entities)")
+			notes = append(notes, "entity address/ZIP missing (set via --entities)")
+		}
+		if cas := corpActions[k]; len(cas) > 0 {
+			notes = append(notes, fmt.Sprintf("%d corporate action(s) in year — verify quantity/cost basis", len(cas)))
 		}
 		for _, e := range concatErrs(initErrs, closeErrs, divErrs, procErrs) {
 			notes = append(notes, e.Error())
 		}
-		row.NeedsReview = true
+		row.NeedsReview = len(notes) > 0
 		row.ReviewNote = strings.Join(notes, "; ")
 
 		rep.A3 = append(rep.A3, row)
 	}
 
+	rep.A2 = []A2Row{buildA2(s, rep.A3)}
 	return rep, nil
+}
+
+// buildA2 assembles the custodial-account row by aggregating the A3 figures.
+// The account peak is an upper bound (it sums per-security peaks, which do not
+// all occur on the same day); cash balances are not included.
+func buildA2(s *model.Statement, a3 []A3Row) A2Row {
+	acc := s.Account
+	var closes, peaks, credited []Amount
+	for _, r := range a3 {
+		closes = append(closes, r.ClosingValue)
+		peaks = append(peaks, r.PeakValue)
+		credited = append(credited, r.GrossDividend)
+	}
+	addr, zip, _, code := institutionMeta(acc.IBEntity)
+	row := A2Row{
+		Institution:    acc.Institution,
+		Address:        addr,
+		ZIP:            zip,
+		CountryCode:    code,
+		AccountNumber:  acc.Number,
+		Status:         "Owner",
+		OpenDate:       fmtDate(acc.OpenDate),
+		PeakBalance:    sumAmounts(peaks),
+		ClosingBalance: sumAmounts(closes),
+		GrossCredited:  sumAmounts(credited),
+	}
+	notes := []string{"peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included"}
+	if code == "" {
+		notes = append(notes, "institution country code unknown")
+	}
+	row.NeedsReview = true
+	row.ReviewNote = strings.Join(notes, "; ")
+	return row
+}
+
+func sumAmounts(amts []Amount) Amount {
+	sum := new(big.Rat)
+	var audit []fx.Conversion
+	for _, a := range amts {
+		sum.Add(sum, ratOf(a.INR))
+		audit = append(audit, a.Audit...)
+	}
+	return Amount{INR: model.NewMoney(model.INR, sum), Audit: audit}
+}
+
+// institutionMeta returns the broker entity's address, ZIP, country name, and
+// ITR country code for Table A2.
+func institutionMeta(ibEntity string) (address, zip, countryName, itrCode string) {
+	switch strings.ToUpper(strings.TrimSpace(ibEntity)) {
+	case "", "IBLLC-US", "IBLLC":
+		return "One Pickwick Plaza, Greenwich, CT", "06830", "United States of America", "2"
+	default:
+		return "", "", "", ""
+	}
 }
 
 // convertEvents converts each event to INR and sums them, collecting the audit

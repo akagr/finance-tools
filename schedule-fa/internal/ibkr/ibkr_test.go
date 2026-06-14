@@ -27,6 +27,20 @@ func TestParseFlexFile(t *testing.T) {
 	if got, want := st.Account.OpenDate, date(2021, 5, 10); !got.Equal(want) {
 		t.Errorf("open date = %v, want %v", got, want)
 	}
+	if st.Account.Institution != "Interactive Brokers LLC" {
+		t.Errorf("institution = %q, want Interactive Brokers LLC", st.Account.Institution)
+	}
+	if st.Account.Street != "12 Market St" || st.Account.PostalCode != "400001" || st.Account.Country != "IN" {
+		t.Errorf("account address not parsed: %+v", st.Account)
+	}
+
+	// One corporate action (AAPL 4-for-1 split) within the year.
+	if len(st.CorporateActions) != 1 {
+		t.Fatalf("corporate actions = %d, want 1", len(st.CorporateActions))
+	}
+	if ca := st.CorporateActions[0]; ca.Instrument.Symbol != "AAPL" || !ca.Date.Equal(date(2024, 8, 28)) {
+		t.Errorf("unexpected corporate action: %+v", ca)
+	}
 
 	// Two open positions (AAPL, VOO); MSFT was fully exited intra-year.
 	if len(st.OpenPositions) != 2 {

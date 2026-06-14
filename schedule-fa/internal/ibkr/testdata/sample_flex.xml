@@ -2,7 +2,7 @@
 <FlexQueryResponse queryName="ScheduleFA" type="AF">
   <FlexStatements count="1">
     <FlexStatement accountId="U1234567" fromDate="20240101" toDate="20241231" period="Year2024" whenGenerated="20250115;120000">
-      <AccountInformation accountId="U1234567" name="Jane Doe" currency="USD" dateOpened="20210510"/>
+      <AccountInformation accountId="U1234567" name="Jane Doe" currency="USD" dateOpened="20210510" ibEntity="IBLLC-US" street="12 Market St" city="Mumbai" state="MH" country="IN" postalCode="400001"/>
       <SecuritiesInfo>
         <SecurityInfo symbol="AAPL" isin="US0378331005" description="APPLE INC" assetCategory="STK" currency="USD" issuerCountryCode="US"/>
         <SecurityInfo symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" assetCategory="ETF" currency="USD" issuerCountryCode="US"/>
@@ -27,6 +27,9 @@
         <CashTransaction accountId="U1234567" type="Dividends" symbol="VOO" isin="US9229083632" description="VOO CASH DIVIDEND" currency="USD" amount="15.00" dateTime="20240925"/>
         <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="OUT OF RANGE DIVIDEND" currency="USD" amount="99.00" dateTime="20250102"/>
       </CashTransactions>
+      <CorporateActions>
+        <CorporateAction accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" currency="USD" type="FS" actionDescription="Forward Split" description="AAPL(US0378331005) SPLIT 4 FOR 1" dateTime="20240828" reportDate="20240828"/>
+      </CorporateActions>
     </FlexStatement>
   </FlexStatements>
 </FlexQueryResponse>

@@ -87,6 +87,18 @@ func (mdRenderer) Render(w io.Writer, r *schedulefa.Report) error {
 	fmt.Fprintf(b, "# Schedule FA — calendar year %d\n\n", r.Year)
 	fmt.Fprintf(b, "> %s\n\n", disclaimer)
 
+	fmt.Fprintf(b, "## Table A2 — Foreign Custodial Account\n\n")
+	for _, a := range r.A2 {
+		fmt.Fprintf(b, "- **Institution:** %s\n", a.Institution)
+		fmt.Fprintf(b, "- **Address:** %s%s · country code %s\n", dash(a.Address), zipSuffix(a.ZIP), dash(a.CountryCode))
+		fmt.Fprintf(b, "- **Account number:** %s · **Status:** %s · **Opened:** %s\n", dash(a.AccountNumber), dash(a.Status), dash(a.OpenDate))
+		fmt.Fprintf(b, "- **Peak balance:** ₹%s · **Closing balance:** ₹%s · **Gross credited:** ₹%s\n", inr(a.PeakBalance.INR), inr(a.ClosingBalance.INR), inr(a.GrossCredited.INR))
+		if a.NeedsReview {
+			fmt.Fprintf(b, "- ⚠︎ _%s_\n", a.ReviewNote)
+		}
+		fmt.Fprintln(b)
+	}
+
 	fmt.Fprintf(b, "## Table A3 — Foreign Equity and Debt Interest\n\n")
 	fmt.Fprintln(b, "| # | Entity | Country (code) | Acquired | Initial (INR) | Peak (INR) | Closing (INR) | Dividend (INR) | Proceeds (INR) | Review |")
 	fmt.Fprintln(b, "|---|--------|----------------|----------|--------------:|-----------:|--------------:|---------------:|---------------:|:------:|")
@@ -183,9 +195,25 @@ func (csvRenderer) Render(w io.Writer, r *schedulefa.Report) error {
 type jsonRenderer struct{}
 
 type jsonReport struct {
-	Year       int          `json:"year"`
-	Disclaimer string       `json:"disclaimer"`
-	A3         []jsonA3Row  `json:"a3"`
+	Year       int         `json:"year"`
+	Disclaimer string      `json:"disclaimer"`
+	A2         []jsonA2Row `json:"a2"`
+	A3         []jsonA3Row `json:"a3"`
+}
+
+type jsonA2Row struct {
+	Institution    string `json:"institution"`
+	Address        string `json:"address"`
+	ZIP            string `json:"zip"`
+	CountryCode    string `json:"country_code"`
+	AccountNumber  string `json:"account_number"`
+	Status         string `json:"status"`
+	OpenDate       string `json:"account_opened"`
+	PeakBalance    string `json:"peak_balance_inr"`
+	ClosingBalance string `json:"closing_balance_inr"`
+	GrossCredited  string `json:"gross_credited_inr"`
+	NeedsReview    bool   `json:"needs_review"`
+	ReviewNote     string `json:"review_note,omitempty"`
 }
 
 type jsonA3Row struct {
@@ -218,6 +246,14 @@ type jsonAudit struct {
 
 func (jsonRenderer) Render(w io.Writer, r *schedulefa.Report) error {
 	out := jsonReport{Year: r.Year, Disclaimer: disclaimer}
+	for _, a := range r.A2 {
+		out.A2 = append(out.A2, jsonA2Row{
+			Institution: a.Institution, Address: a.Address, ZIP: a.ZIP, CountryCode: a.CountryCode,
+			AccountNumber: a.AccountNumber, Status: a.Status, OpenDate: a.OpenDate,
+			PeakBalance: inr(a.PeakBalance.INR), ClosingBalance: inr(a.ClosingBalance.INR),
+			GrossCredited: inr(a.GrossCredited.INR), NeedsReview: a.NeedsReview, ReviewNote: a.ReviewNote,
+		})
+	}
 	for _, row := range r.A3 {
 		jr := jsonA3Row{
 			CountryName:   row.CountryName,
@@ -294,6 +330,13 @@ func dash(s string) string {
 		return "—"
 	}
 	return s
+}
+
+func zipSuffix(zip string) string {
+	if zip == "" {
+		return ""
+	}
+	return " " + zip
 }
 
 // q quotes a CSV field if it contains a comma, quote, or newline.

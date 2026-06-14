@@ -69,8 +69,18 @@ type Trade struct {
 type Lot struct {
 	Instrument Instrument
 	OpenDate   time.Time
+	VestDate   time.Time // for RSUs: the vesting date = date of acquiring the interest (zero if N/A)
 	Quantity   *big.Rat
 	CostBasis  Money // total cost in trade currency at acquisition
+}
+
+// AcquiredOn is the date the interest was acquired: the vesting date for RSUs,
+// otherwise the lot open date.
+func (l Lot) AcquiredOn() time.Time {
+	if !l.VestDate.IsZero() {
+		return l.VestDate
+	}
+	return l.OpenDate
 }
 
 // Dividend is a cash distribution. Schedule FA wants the GROSS figure; the US
@@ -97,16 +107,33 @@ type Account struct {
 	Name         string
 	BaseCurrency Currency
 	OpenDate     time.Time
-	Institution  string // "Interactive Brokers LLC"
+	Institution  string // legal IB entity, e.g. "Interactive Brokers LLC"
+	IBEntity     string // raw ibEntity code from the statement, e.g. "IBLLC-US"
+	// Holder's address as recorded with IBKR (not the institution's address).
+	Street     string
+	City       string
+	State      string
+	PostalCode string
+	Country    string // ISO-2, e.g. "US"
+}
+
+// CorporateAction is a split/merger/spin-off etc. affecting a holding. We do not
+// reprocess these; their presence flags the affected security for manual review.
+type CorporateAction struct {
+	Instrument  Instrument
+	Date        time.Time
+	Type        string
+	Description string
 }
 
 // Statement is everything parsed from one IBKR Activity Flex export, already
 // constrained to a single calendar year.
 type Statement struct {
-	Account       Account
-	Year          int        // calendar year, e.g. 2024
-	OpenPositions []Position // as on 31-Dec
-	Lots          []Lot
-	Trades        []Trade
-	Dividends     []Dividend
+	Account          Account
+	Year             int        // calendar year, e.g. 2024
+	OpenPositions    []Position // as on 31-Dec
+	Lots             []Lot
+	Trades           []Trade
+	Dividends        []Dividend
+	CorporateActions []CorporateAction
 }

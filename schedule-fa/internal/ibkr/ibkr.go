@@ -57,12 +57,19 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 	for _, st := range resp.Statements.Statement {
 		// Account (first non-empty wins; statements are usually one).
 		if out.Account.Number == "" {
+			ai := st.AccountInfo
 			out.Account = model.Account{
-				Number:       firstNonEmpty(st.AccountInfo.AccountID, st.AccountID),
-				Name:         st.AccountInfo.Name,
-				BaseCurrency: model.Currency(st.AccountInfo.Currency),
-				OpenDate:     mustDate(st.AccountInfo.DateOpened),
-				Institution:  "Interactive Brokers LLC",
+				Number:       firstNonEmpty(ai.AccountID, st.AccountID),
+				Name:         ai.Name,
+				BaseCurrency: model.Currency(ai.Currency),
+				OpenDate:     mustDate(ai.DateOpened),
+				Institution:  institutionFor(ai.IBEntity),
+				IBEntity:     ai.IBEntity,
+				Street:       ai.Street,
+				City:         ai.City,
+				State:        ai.State,
+				PostalCode:   ai.PostalCode,
+				Country:      ai.Country,
 			}
 		}
 
@@ -106,6 +113,7 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 					out.Lots = append(out.Lots, model.Lot{
 						Instrument: inst,
 						OpenDate:   mustDate(firstNonEmpty(l.OpenDateTime, l.HoldingPeriodDateTime)),
+						VestDate:   mustDate(l.VestingDate),
 						Quantity:   parseRat(l.Position),
 						CostBasis:  money(p.Currency, l.CostBasisMoney),
 					})
@@ -114,6 +122,7 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 				out.Lots = append(out.Lots, model.Lot{
 					Instrument: inst,
 					OpenDate:   mustDate(firstNonEmpty(p.OpenDateTime, p.HoldingPeriodDateTime)),
+					VestDate:   mustDate(p.VestingDate),
 					Quantity:   parseRat(p.Position),
 					CostBasis:  money(p.Currency, p.CostBasisMoney),
 				})
@@ -177,9 +186,46 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 			}
 		}
 		out.Dividends = append(out.Dividends, pending...)
+
+		// Corporate actions within the year (flagged, not reprocessed).
+		for _, ca := range st.CorporateActions.Actions {
+			d := mustDate(firstNonEmpty(ca.DateTime, ca.ReportDate))
+			if !inYear(d) {
+				continue
+			}
+			inst := mergeInst(model.Instrument{
+				Symbol: ca.Symbol, ISIN: ca.ISIN, Name: ca.Description,
+				AssetClass: ca.AssetCategory, Currency: model.Currency(ca.Currency),
+			})
+			out.CorporateActions = append(out.CorporateActions, model.CorporateAction{
+				Instrument:  inst,
+				Date:        d,
+				Type:        firstNonEmpty(ca.Type, ca.ActionDescription),
+				Description: ca.Description,
+			})
+		}
 	}
 
 	return out, nil
+}
+
+// institutionFor maps an IBKR entity code to the legal institution name. The
+// holder's own address comes from AccountInformation; this is the broker entity.
+func institutionFor(ibEntity string) string {
+	switch strings.ToUpper(strings.TrimSpace(ibEntity)) {
+	case "", "IBLLC-US", "IBLLC":
+		return "Interactive Brokers LLC"
+	case "IBUK", "IBUK-L":
+		return "Interactive Brokers (U.K.) Limited"
+	case "IBIE":
+		return "Interactive Brokers Ireland Limited"
+	case "IBCE":
+		return "Interactive Brokers Central Europe Zrt."
+	case "IBKR-IN", "IBINDIA":
+		return "Interactive Brokers (India) Pvt. Ltd."
+	default:
+		return "Interactive Brokers (" + ibEntity + ")"
+	}
 }
 
 // --- XML schema (only the attributes we use; unknowns are ignored) ---
@@ -206,6 +252,9 @@ type flexStatement struct {
 	CashTransactions struct {
 		Txns []flexCashTxn `xml:"CashTransaction"`
 	} `xml:"CashTransactions"`
+	CorporateActions struct {
+		Actions []flexCorpAction `xml:"CorporateAction"`
+	} `xml:"CorporateActions"`
 	SecuritiesInfo struct {
 		Securities []flexSecurityInfo `xml:"SecurityInfo"`
 	} `xml:"SecuritiesInfo"`
@@ -216,6 +265,12 @@ type flexAccountInfo struct {
 	Name       string `xml:"name,attr"`
 	Currency   string `xml:"currency,attr"`
 	DateOpened string `xml:"dateOpened,attr"`
+	IBEntity   string `xml:"ibEntity,attr"`
+	Street     string `xml:"street,attr"`
+	City       string `xml:"city,attr"`
+	State      string `xml:"state,attr"`
+	Country    string `xml:"country,attr"`
+	PostalCode string `xml:"postalCode,attr"`
 }
 
 type flexOpenPosition struct {
@@ -230,6 +285,7 @@ type flexOpenPosition struct {
 	CostBasisMoney        string    `xml:"costBasisMoney,attr"`
 	OpenDateTime          string    `xml:"openDateTime,attr"`
 	HoldingPeriodDateTime string    `xml:"holdingPeriodDateTime,attr"`
+	VestingDate           string    `xml:"vestingDate,attr"`
 	IssuerCountryCode     string    `xml:"issuerCountryCode,attr"`
 	Lots                  []flexLot `xml:"Lot"`
 }
@@ -239,6 +295,7 @@ type flexLot struct {
 	CostBasisMoney        string `xml:"costBasisMoney,attr"`
 	OpenDateTime          string `xml:"openDateTime,attr"`
 	HoldingPeriodDateTime string `xml:"holdingPeriodDateTime,attr"`
+	VestingDate           string `xml:"vestingDate,attr"`
 }
 
 type flexTrade struct {
@@ -266,6 +323,18 @@ type flexCashTxn struct {
 	Amount     string `xml:"amount,attr"`
 	DateTime   string `xml:"dateTime,attr"`
 	SettleDate string `xml:"settleDate,attr"`
+}
+
+type flexCorpAction struct {
+	AssetCategory     string `xml:"assetCategory,attr"`
+	Symbol            string `xml:"symbol,attr"`
+	ISIN              string `xml:"isin,attr"`
+	Currency          string `xml:"currency,attr"`
+	Type              string `xml:"type,attr"`
+	ActionDescription string `xml:"actionDescription,attr"`
+	Description       string `xml:"description,attr"`
+	DateTime          string `xml:"dateTime,attr"`
+	ReportDate        string `xml:"reportDate,attr"`
 }
 
 type flexSecurityInfo struct {

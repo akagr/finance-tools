@@ -277,8 +277,11 @@ schedulefa generate \
   full pipeline end-to-end. Conversion-date conventions documented in `build.go`.
 - **M4 — Exact peak:** daily share reconstruction from trades + pluggable price provider
   (mode B). Mode C stays as labelled fallback.
-- **M5 — A2 + edge cases:** custodial account row; exited positions; corporate actions &
-  RSU handling; entity metadata table; manual-review flags.
+- **M5 — A2 + edge cases:** ✅ Table A2 custodial-account row (aggregates A3; account peak
+  is a flagged upper bound, cash excluded); `entities` metadata package (CSV override for
+  address/ZIP/country code/nature, via `--entities`); RSU vesting date as acquisition date;
+  corporate-action parsing + review flags; richer AccountInformation (address, ibEntity).
+  Review flags now trip only on real data gaps. A2 rendered in md/json.
 - **M6 — Flex Web Service:** online pull (SendRequest/GetStatement, polling).
 - **M7 — Renderers & UX:** HTML/PDF, reconciliation summary, README, sample data.
 
