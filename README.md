@@ -1,8 +1,13 @@
 # tax-tools
 
+[![CI](https://github.com/akagr/tax-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/akagr/tax-tools/actions/workflows/ci.yml)
+
 A monorepo of small, focused tools for Indian tax filing from broker/financial data.
 Each tool is an isolated Go module under its own directory, tied together by a root
 `go.work` workspace.
+
+> The badge and module paths assume the repo slug `github.com/akagr/tax-tools`; adjust if
+> your remote differs (also in `schedule-fa/go.mod` and `go.work`).
 
 ## Tools
 

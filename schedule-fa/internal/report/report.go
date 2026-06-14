@@ -220,31 +220,31 @@ type jsonA2Row struct {
 }
 
 type jsonA3Row struct {
-	CountryName   string       `json:"country_name"`
-	CountryCode   string       `json:"country_code"`
-	EntityName    string       `json:"entity_name"`
-	Address       string       `json:"address,omitempty"`
-	ZIP           string       `json:"zip,omitempty"`
-	Nature        string       `json:"nature"`
-	AcquiredOn    string       `json:"acquired_on"`
-	InitialValue  string       `json:"initial_value_inr"`
-	PeakValue     string       `json:"peak_value_inr"`
-	PeakApprox    bool         `json:"peak_approximate"`
-	ClosingValue  string       `json:"closing_value_inr"`
-	GrossDividend string       `json:"gross_dividend_inr"`
-	SaleProceeds  string       `json:"sale_proceeds_inr"`
-	NeedsReview   bool         `json:"needs_review"`
-	ReviewNote    string       `json:"review_note,omitempty"`
-	Audit         []jsonAudit  `json:"audit,omitempty"`
+	CountryName   string      `json:"country_name"`
+	CountryCode   string      `json:"country_code"`
+	EntityName    string      `json:"entity_name"`
+	Address       string      `json:"address,omitempty"`
+	ZIP           string      `json:"zip,omitempty"`
+	Nature        string      `json:"nature"`
+	AcquiredOn    string      `json:"acquired_on"`
+	InitialValue  string      `json:"initial_value_inr"`
+	PeakValue     string      `json:"peak_value_inr"`
+	PeakApprox    bool        `json:"peak_approximate"`
+	ClosingValue  string      `json:"closing_value_inr"`
+	GrossDividend string      `json:"gross_dividend_inr"`
+	SaleProceeds  string      `json:"sale_proceeds_inr"`
+	NeedsReview   bool        `json:"needs_review"`
+	ReviewNote    string      `json:"review_note,omitempty"`
+	Audit         []jsonAudit `json:"audit,omitempty"`
 }
 
 type jsonAudit struct {
-	Figure     string `json:"figure"`
-	Currency   string `json:"source_currency"`
-	SourceAmt  string `json:"source_amount"`
-	TTBR       string `json:"ttbr"`
-	RateDate   string `json:"rate_date"`
-	ResultINR  string `json:"result_inr"`
+	Figure    string `json:"figure"`
+	Currency  string `json:"source_currency"`
+	SourceAmt string `json:"source_amount"`
+	TTBR      string `json:"ttbr"`
+	RateDate  string `json:"rate_date"`
+	ResultINR string `json:"result_inr"`
 }
 
 func (jsonRenderer) Render(w io.Writer, r *schedulefa.Report) error {
@@ -317,8 +317,8 @@ func ratOf(m model.Money) *big.Rat {
 	return m.Amount
 }
 
-func inr(m model.Money) string  { return money(ratOf(m)) }
-func money(r *big.Rat) string   { return r.FloatString(2) }
+func inr(m model.Money) string { return money(ratOf(m)) }
+func money(r *big.Rat) string  { return r.FloatString(2) }
 
 func rate(r fx.Rate) string {
 	if r.INRPerUnit == nil {

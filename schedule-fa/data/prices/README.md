@@ -1,3 +1,4 @@
+
 # Daily price data (exact peak, mode B)
 
 The exact peak engine (`--prices`) needs a daily per-unit **close** price for each

@@ -363,14 +363,14 @@ type flexTrade struct {
 }
 
 type flexCashTxn struct {
-	Type       string `xml:"type,attr"`
-	Symbol     string `xml:"symbol,attr"`
-	ISIN       string `xml:"isin,attr"`
+	Type        string `xml:"type,attr"`
+	Symbol      string `xml:"symbol,attr"`
+	ISIN        string `xml:"isin,attr"`
 	Description string `xml:"description,attr"`
-	Currency   string `xml:"currency,attr"`
-	Amount     string `xml:"amount,attr"`
-	DateTime   string `xml:"dateTime,attr"`
-	SettleDate string `xml:"settleDate,attr"`
+	Currency    string `xml:"currency,attr"`
+	Amount      string `xml:"amount,attr"`
+	DateTime    string `xml:"dateTime,attr"`
+	SettleDate  string `xml:"settleDate,attr"`
 }
 
 type flexCorpAction struct {
