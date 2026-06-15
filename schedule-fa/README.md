@@ -131,7 +131,3 @@ All milestones complete (M0–M7):
 go build ./cmd/schedulefa      # from schedule-fa/
 go test ./...
 ```
-
-Or use [`just`](https://github.com/casey/just) from the repo root: `just` lists recipes —
-`just test`, `just check` (the CI gate), `just build`, `just rates`, `just prices 2026`,
-`just generate --year 2026 …`.
