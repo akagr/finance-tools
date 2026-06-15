@@ -27,3 +27,4 @@ secrets.*
 # Third-party / user data (not vendored — see each dir's README)
 schedule-fa/data/ttbr/*.csv
 schedule-fa/data/prices/*.csv
+/schedulefa
