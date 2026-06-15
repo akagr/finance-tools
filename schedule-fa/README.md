@@ -11,6 +11,22 @@ challenges, decisions, architecture, and milestones.
 > **Disclaimer:** Not tax advice. The output is a working draft to verify (ideally with a
 > CA) before filing. You remain responsible for what you file.
 
+## Example output
+
+The printable HTML report (rendered from synthetic sample data — no real holdings):
+
+<p align="center">
+  <img src="docs/img/report-html-sample.png" alt="Sample Schedule FA HTML report" width="640">
+</p>
+
+Complete example reports in every format live in
+[`internal/pipeline/testdata/golden/`](internal/pipeline/testdata/golden/) —
+[`report.md`](internal/pipeline/testdata/golden/report.md),
+[`report.csv`](internal/pipeline/testdata/golden/report.csv),
+[`report.json`](internal/pipeline/testdata/golden/report.json), and
+[`report.html`](internal/pipeline/testdata/golden/report.html). These are the golden fixtures
+the offline pipeline is tested against, so they always reflect the tool's current output.
+
 ---
 
 ## Getting your data from IBKR
