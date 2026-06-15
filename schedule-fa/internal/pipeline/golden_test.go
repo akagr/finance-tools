@@ -35,7 +35,7 @@ func TestGoldenOfflineReport(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 
-	for _, f := range []report.Format{report.CSV, report.JSON, report.Markdown} {
+	for _, f := range []report.Format{report.CSV, report.JSON, report.Markdown, report.HTML} {
 		rnd, err := report.For(f)
 		if err != nil {
 			t.Fatal(err)

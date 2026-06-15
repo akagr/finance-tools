@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule FA — 2024</title>
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --warn:#a8400a; --bg:#fff; }
+  * { box-sizing: border-box; }
+  body { font: 14px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+         color: var(--ink); background: var(--bg); margin: 2rem auto; max-width: 1000px; padding: 0 1rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.1rem; margin: 2rem 0 .5rem; border-bottom: 2px solid var(--ink); padding-bottom: .2rem; }
+  .disclaimer { color: var(--muted); font-size: .85rem; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0; }
+  th, td { border: 1px solid var(--line); padding: .35rem .5rem; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .card td { border: none; padding: .15rem .5rem .15rem 0; }
+  .card th { background: none; border: none; text-align: left; padding: .15rem 1rem .15rem 0; white-space: nowrap; color: var(--muted); font-weight: 500; }
+  .review { color: var(--warn); font-size: .85rem; margin: .25rem 0; }
+  .flag { color: var(--warn); font-weight: 700; }
+  details { margin: .4rem 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  summary .sub { color: var(--muted); font-weight: 400; }
+  .audit th { background: #fafafa; }
+  footer { color: var(--muted); font-size: .8rem; margin-top: 2rem; border-top: 1px solid var(--line); padding-top: .5rem; }
+  @media print {
+    body { margin: 0; max-width: none; font-size: 11px; }
+    h2 { page-break-after: avoid; }
+    tr, details { page-break-inside: avoid; }
+    details[open] summary ~ * { display: revert; }
+    details > *:not(summary) { display: block; }
+    summary { list-style: none; }
+  }
+</style>
+</head>
+<body>
+<h1>Schedule FA — calendar year 2024</h1>
+<p class="disclaimer">Not tax advice. A working draft to verify before filing. Schedule FA covers the CALENDAR year; see the audit trail for every figure.</p>
+
+<h2>Table A2 — Foreign Custodial Account</h2>
+
+<table class="card">
+  <tr><th>Institution</th><td>Interactive Brokers LLC</td></tr>
+  <tr><th>Address</th><td>One Pickwick Plaza, Greenwich, CT 06830 · country code 1</td></tr>
+  <tr><th>Account number</th><td>U1234567</td></tr>
+  <tr><th>Status / Opened</th><td>Owner · 2021-05-10</td></tr>
+  <tr><th>Peak balance</th><td>₹3352670.00</td></tr>
+  <tr><th>Closing balance</th><td>₹2600720.00</td></tr>
+  <tr><th>Gross credited</th><td>₹3330.75</td></tr>
+</table>
+<p class="review">⚠︎ peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included</p>
+
+
+<h2>Table A3 — Foreign Equity and Debt Interest</h2>
+<table>
+  <thead><tr>
+    <th>#</th><th>Entity</th><th>Country (code)</th><th>Acquired</th>
+    <th class="num">Initial</th><th class="num">Peak</th><th class="num">Closing</th>
+    <th class="num">Dividend</th><th class="num">Proceeds</th><th>Review</th>
+  </tr></thead>
+  <tbody>
+  
+    <tr>
+      <td>1</td>
+      <td>APPLE INC</td>
+      <td>United States of America (1)</td>
+      <td>2023-01-10</td>
+      <td class="num">498600.00</td>
+      <td class="num">2138750.00</td>
+      <td class="num">2138750.00</td>
+      <td class="num">2077.50</td>
+      <td class="num">0.00</td>
+      <td><span class="flag">⚠︎</span></td>
+    </tr>
+  
+    <tr>
+      <td>2</td>
+      <td>MICROSOFT CORP</td>
+      <td>United States of America (1)</td>
+      <td>2024-02-01</td>
+      <td class="num">664800.00</td>
+      <td class="num">751950.00</td>
+      <td class="num">0.00</td>
+      <td class="num">0.00</td>
+      <td class="num">751950.00</td>
+      <td><span class="flag">⚠︎</span></td>
+    </tr>
+  
+    <tr>
+      <td>3</td>
+      <td>VANGUARD S&amp;P 500 ETF</td>
+      <td>United States of America (1)</td>
+      <td>2024-06-20</td>
+      <td class="num">417750.00</td>
+      <td class="num">461970.00</td>
+      <td class="num">461970.00</td>
+      <td class="num">1253.25</td>
+      <td class="num">0.00</td>
+      <td><span class="flag">⚠︎</span></td>
+    </tr>
+  
+  </tbody>
+</table>
+
+<h2>Reconciliation</h2>
+<table class="card">
+  <tr><th>Securities (A3 rows)</th><td>3</td></tr>
+  <tr><th>Rows needing review</th><td>3</td></tr>
+  <tr><th>Total closing value</th><td>₹2600720.00</td></tr>
+  <tr><th>Total gross dividend</th><td>₹3330.75</td></tr>
+  <tr><th>Total sale proceeds</th><td>₹751950.00</td></tr>
+</table>
+
+<h2>Audit trail</h2>
+<p class="disclaimer">Each INR figure and the SBI TTBR (rate date actually used) behind it.</p>
+
+<details open>
+  <summary>1. APPLE INC <span class="flag">⚠︎</span>
+    <span class="sub">— entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)</span></summary>
+  <table class="audit">
+    <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
+    <tbody>
+    
+      <tr><td>Initial value</td><td>USD 6000.00</td><td class="num">83.1000</td><td>2024-01-05</td><td class="num">498600.00</td></tr>
+    
+      <tr><td>Peak value</td><td>USD 25000.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">2138750.00</td></tr>
+    
+      <tr><td>Closing value</td><td>USD 25000.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">2138750.00</td></tr>
+    
+      <tr><td>Dividend</td><td>USD 25.00</td><td class="num">83.1000</td><td>2024-01-05</td><td class="num">2077.50</td></tr>
+    
+    </tbody>
+  </table>
+</details>
+
+<details open>
+  <summary>2. MICROSOFT CORP <span class="flag">⚠︎</span>
+    <span class="sub">— entity address/ZIP missing (set via --entities)</span></summary>
+  <table class="audit">
+    <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
+    <tbody>
+    
+      <tr><td>Initial value</td><td>USD 8000.00</td><td class="num">83.1000</td><td>2024-01-05</td><td class="num">664800.00</td></tr>
+    
+      <tr><td>Peak value</td><td>USD 9000.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">751950.00</td></tr>
+    
+      <tr><td>Sale proceeds</td><td>USD 9000.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">751950.00</td></tr>
+    
+    </tbody>
+  </table>
+</details>
+
+<details open>
+  <summary>3. VANGUARD S&amp;P 500 ETF <span class="flag">⚠︎</span>
+    <span class="sub">— entity address/ZIP missing (set via --entities)</span></summary>
+  <table class="audit">
+    <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
+    <tbody>
+    
+      <tr><td>Initial value</td><td>USD 3500.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">292425.00</td></tr>
+    
+      <tr><td>Initial value</td><td>USD 1500.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">125325.00</td></tr>
+    
+      <tr><td>Peak value</td><td>USD 5400.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">461970.00</td></tr>
+    
+      <tr><td>Closing value</td><td>USD 5400.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">461970.00</td></tr>
+    
+      <tr><td>Dividend</td><td>USD 15.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">1253.25</td></tr>
+    
+    </tbody>
+  </table>
+</details>
+
+
+<footer>Not tax advice. A working draft to verify before filing. Schedule FA covers the CALENDAR year; see the audit trail for every figure.</footer>
+</body>
+</html>
