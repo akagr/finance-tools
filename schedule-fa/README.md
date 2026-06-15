@@ -16,7 +16,7 @@ challenges, decisions, architecture, and milestones.
 The printable HTML report (rendered from synthetic sample data — no real holdings):
 
 <p align="center">
-  <img src="docs/img/report-html-sample.png" alt="Sample Schedule FA HTML report" width="640">
+  <img src="docs/img/report-sample-v2.png" alt="Sample Schedule FA HTML report" width="640">
 </p>
 
 Complete example reports in every format live in
