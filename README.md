@@ -34,4 +34,8 @@ go build ./...        # from repo root, builds every module in the workspace
 
 > **Disclaimer:** Nothing here is tax advice. Output is a working draft to be verified by
 > the taxpayer or a qualified professional before filing.
+
+## License
+
+[MIT](LICENSE) © Akash Agrawal
 </content>
