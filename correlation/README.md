@@ -35,6 +35,11 @@ go run ./cmd/correlation compute --prices data/prices.csv --base-currency INR --
 Converting to a common currency typically **changes** the correlation — that shift is exactly
 the diversification (or lack of it) the FX exposure adds.
 
+> **Keep the FX window in sync with prices.** The FX series must span the whole price date
+> range, so fetch both over the *same* dates. If you later re-fetch prices over a longer window
+> (or add an older asset), re-fetch `fx.csv` too — otherwise `compute` stops with an error
+> naming the gap and the range to re-fetch.
+
 ## Usage
 
 ```

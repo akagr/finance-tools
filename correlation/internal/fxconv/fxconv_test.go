@@ -4,6 +4,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,8 +84,31 @@ func TestConvertMissingRateErrors(t *testing.T) {
 	s := series.Series{Label: "X", Currency: "USD", Points: []series.Point{
 		{Date: date("2024-01-01"), Close: 10}, // before any rate -> error
 	}}
-	if _, err := Convert(s, "INR", tab); err == nil {
+	_, err := Convert(s, "INR", tab)
+	if err == nil {
 		t.Fatal("want error when no rate on or before the date")
+	}
+	// Error must be actionable: report actual coverage and a re-fetch hint.
+	for _, want := range []string{"2024-06-01", "re-fetch", "fetch.py fx"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q missing %q", err.Error(), want)
+		}
+	}
+}
+
+func TestConvertNoRatesForCurrencyErrors(t *testing.T) {
+	tab := writeFX(t, `date,currency,rate
+2024-06-01,EUR,90.0
+`)
+	s := series.Series{Label: "X", Currency: "USD", Points: []series.Point{
+		{Date: date("2024-06-02"), Close: 10}, // USD has no rates at all
+	}}
+	_, err := Convert(s, "INR", tab)
+	if err == nil {
+		t.Fatal("want error when currency has no rates")
+	}
+	if !strings.Contains(err.Error(), "no USD->INR rates at all") {
+		t.Errorf("error %q should say there are no rates at all", err.Error())
 	}
 }
 

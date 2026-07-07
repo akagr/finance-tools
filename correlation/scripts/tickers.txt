@@ -5,3 +5,4 @@
 
 VWRA     VWRA.L   USD
 Nifty50  ^NSEI    INR
+GOLDBEES  GOLDBEES.NS    INR

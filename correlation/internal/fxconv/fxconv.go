@@ -110,6 +110,16 @@ func (t *Table) rateOn(currency string, d time.Time) (float64, bool) {
 	return pts[i-1].rate, true
 }
 
+// coverage returns the earliest and latest dates for which a currency has a
+// rate, and whether any exist. Used to build actionable gap errors.
+func (t *Table) coverage(currency string) (first, last time.Time, ok bool) {
+	pts := t.byCurrency[currency]
+	if len(pts) == 0 {
+		return time.Time{}, time.Time{}, false
+	}
+	return pts[0].date, pts[len(pts)-1].date, true
+}
+
 // Convert returns s expressed in base currency. A series already in base is
 // returned unchanged. Every point needs a rate (with fallback); a gap is an
 // error so silent mis-conversion can't happen.
@@ -124,9 +134,27 @@ func Convert(s series.Series, base string, t *Table) (series.Series, error) {
 	for i, p := range s.Points {
 		rate, ok := t.rateOn(s.Currency, p.Date)
 		if !ok {
-			return series.Series{}, fmt.Errorf("fxconv: no %s->%s rate on or before %s (for %q)", s.Currency, base, p.Date.Format(dateLayout), s.Label)
+			return series.Series{}, gapError(s, base, p.Date, t)
 		}
 		out.Points[i] = series.Point{Date: p.Date, Close: p.Close * rate}
 	}
 	return out, nil
+}
+
+// gapError explains an FX coverage gap and how to fix it. The most common cause
+// is FX data that doesn't span the price date range (e.g. prices re-fetched over
+// a longer window than fx), so the message reports the actual coverage.
+func gapError(s series.Series, base string, need time.Time, t *Table) error {
+	first, last, ok := t.coverage(s.Currency)
+	if !ok {
+		return fmt.Errorf("fxconv: %q is in %s but the FX data has no %s->%s rates at all; "+
+			"fetch them, e.g. scripts/fetch.py fx <start> <end> %s:%s=X",
+			s.Label, s.Currency, s.Currency, base, s.Currency, base)
+	}
+	return fmt.Errorf("fxconv: no %s->%s rate on or before %s (needed for %q); "+
+		"FX data only covers %s..%s — re-fetch it over the price range, "+
+		"e.g. scripts/fetch.py fx %s <end> %s:%s=X",
+		s.Currency, base, need.Format(dateLayout), s.Label,
+		first.Format(dateLayout), last.Format(dateLayout),
+		need.Format(dateLayout), s.Currency, base)
 }
