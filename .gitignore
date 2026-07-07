@@ -28,3 +28,11 @@ secrets.*
 schedule-fa/data/ttbr/*.csv
 schedule-fa/data/prices/*.csv
 /schedulefa
+
+# correlation: fetched market data and built binary (not vendored)
+correlation/data/*.csv
+correlation/correlation
+
+# Python bytecode
+__pycache__/
+*.pyc

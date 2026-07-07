@@ -10,17 +10,21 @@ permissions:
 
 jobs:
   test:
-    name: build & test (schedule-fa)
+    name: build & test (${{ matrix.module }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [schedule-fa, correlation]
     defaults:
       run:
-        working-directory: schedule-fa
+        working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: schedule-fa/go.mod
+          go-version-file: ${{ matrix.module }}/go.mod
           # No external dependencies, so module caching adds nothing.
           cache: false
 

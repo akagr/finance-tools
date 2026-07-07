@@ -1,0 +1,68 @@
+{
+  "frequency": "weekly",
+  "return_kind": "log",
+  "start": "2024-01-05",
+  "end": "2024-03-01",
+  "observations": 8,
+  "assets": [
+    {
+      "label": "VWRA",
+      "currency": "USD",
+      "converted": false
+    },
+    {
+      "label": "^NSEI",
+      "currency": "INR",
+      "converted": false
+    }
+  ],
+  "labels": [
+    "VWRA",
+    "^NSEI"
+  ],
+  "correlation": [
+    [
+      1,
+      0.516311
+    ],
+    [
+      0.516311,
+      1
+    ]
+  ],
+  "covariance": [
+    [
+      0.000064,
+      0.000035
+    ],
+    [
+      0.000035,
+      0.000072
+    ]
+  ],
+  "mean_return": [
+    0.008879,
+    0.006549
+  ],
+  "stdev": [
+    0.008025,
+    0.008513
+  ],
+  "annualised_volatility": [
+    0.057868,
+    0.061389
+  ],
+  "pairs": [
+    {
+      "a": "VWRA",
+      "b": "^NSEI",
+      "r": 0.516311,
+      "ci95_lo": -0.296088,
+      "ci95_hi": 0.895261
+    }
+  ],
+  "notes": [
+    "Native mode with mixed currencies (INR, USD): these correlations blend asset and FX co-movement. Pass --base-currency (with --fx) to normalise to one currency.",
+    "Small sample: only 8 weekly return observations. Correlations are noisy; prefer a longer window or a lower frequency."
+  ]
+}

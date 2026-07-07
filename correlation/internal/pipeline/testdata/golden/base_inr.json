@@ -1,0 +1,68 @@
+{
+  "frequency": "weekly",
+  "return_kind": "log",
+  "base_currency": "INR",
+  "start": "2024-01-05",
+  "end": "2024-03-01",
+  "observations": 8,
+  "assets": [
+    {
+      "label": "VWRA",
+      "currency": "INR",
+      "converted": true
+    },
+    {
+      "label": "^NSEI",
+      "currency": "INR",
+      "converted": false
+    }
+  ],
+  "labels": [
+    "VWRA",
+    "^NSEI"
+  ],
+  "correlation": [
+    [
+      1,
+      0.457029
+    ],
+    [
+      0.457029,
+      1
+    ]
+  ],
+  "covariance": [
+    [
+      0.000074,
+      0.000033
+    ],
+    [
+      0.000033,
+      0.000072
+    ]
+  ],
+  "mean_return": [
+    0.008475,
+    0.006549
+  ],
+  "stdev": [
+    0.008596,
+    0.008513
+  ],
+  "annualised_volatility": [
+    0.061989,
+    0.061389
+  ],
+  "pairs": [
+    {
+      "a": "VWRA",
+      "b": "^NSEI",
+      "r": 0.457029,
+      "ci95_lo": -0.365286,
+      "ci95_hi": 0.878709
+    }
+  ],
+  "notes": [
+    "Small sample: only 8 weekly return observations. Correlations are noisy; prefer a longer window or a lower frequency."
+  ]
+}

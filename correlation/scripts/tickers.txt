@@ -1,0 +1,7 @@
+# Ticker map for scripts/fetch.py — one asset per line:
+#   <label>  <yahoo-symbol>  [currency]
+# Lines starting with '#' are ignored; currency defaults to USD.
+# Look up Yahoo symbols at https://finance.yahoo.com (indices start with '^').
+
+VWRA     VWRA.L   USD
+Nifty50  ^NSEI    INR
