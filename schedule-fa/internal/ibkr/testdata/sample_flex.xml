@@ -18,14 +18,20 @@
       </OpenPositions>
       <Trades>
         <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" tradeDate="20240315" buySell="BUY" quantity="40" tradePrice="150.00" proceeds="-6000.00" ibCommission="-1.00" issuerCountryCode="US"/>
-        <Trade accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" tradeDate="20240620" buySell="BUY" quantity="10" tradePrice="500.00" proceeds="-5000.00" ibCommission="-1.00" issuerCountryCode="US"/>
-        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240201" buySell="BUY" quantity="20" tradePrice="400.00" proceeds="-8000.00" ibCommission="-1.00" issuerCountryCode="US"/>
-        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240901" buySell="SELL" quantity="20" tradePrice="450.00" proceeds="9000.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" tradeDate="20240620" buySell="BUY" quantity="7" tradePrice="500.00" proceeds="-3500.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="ETF" symbol="VOO" isin="US9229083632" description="VANGUARD S&amp;P 500 ETF" currency="USD" tradeDate="20240815" buySell="BUY" quantity="3" tradePrice="500.00" proceeds="-1500.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240201" buySell="BUY" quantity="12" tradePrice="390.00" proceeds="-4680.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240701" buySell="BUY" quantity="8" tradePrice="415.00" proceeds="-3320.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20240815" buySell="SELL" quantity="10" tradePrice="445.00" proceeds="4450.00" ibCommission="-1.00" issuerCountryCode="US"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" currency="USD" tradeDate="20241120" buySell="SELL" quantity="10" tradePrice="455.00" proceeds="4550.00" ibCommission="-1.00" issuerCountryCode="US"/>
       </Trades>
       <CashTransactions>
         <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND" currency="USD" amount="25.00" dateTime="20240613"/>
         <CashTransaction accountId="U1234567" type="Withholding Tax" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND - US TAX" currency="USD" amount="-6.25" dateTime="20240613"/>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND" currency="USD" amount="30.00" dateTime="20240912"/>
+        <CashTransaction accountId="U1234567" type="Withholding Tax" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND - US TAX" currency="USD" amount="-7.50" dateTime="20240912"/>
         <CashTransaction accountId="U1234567" type="Dividends" symbol="VOO" isin="US9229083632" description="VOO CASH DIVIDEND" currency="USD" amount="15.00" dateTime="20240925"/>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="VOO" isin="US9229083632" description="VOO CASH DIVIDEND" currency="USD" amount="12.00" dateTime="20241115"/>
         <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="OUT OF RANGE DIVIDEND" currency="USD" amount="99.00" dateTime="20250102"/>
       </CashTransactions>
       <CorporateActions>

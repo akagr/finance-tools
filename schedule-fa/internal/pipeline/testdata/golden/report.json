@@ -10,9 +10,9 @@
       "account_number": "U1234567",
       "status": "Owner",
       "account_opened": "2021-05-10",
-      "peak_balance_inr": "3352670.00",
+      "peak_balance_inr": "3349210.00",
       "closing_balance_inr": "2600720.00",
-      "gross_credited_inr": "3330.75",
+      "gross_credited_inr": "6906.05",
       "needs_review": true,
       "review_note": "peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included"
     }
@@ -24,11 +24,11 @@
       "entity_name": "APPLE INC",
       "nature": "Listed equity share",
       "acquired_on": "2023-01-10",
-      "initial_value_inr": "498600.00",
+      "initial_value_inr": "499500.00",
       "peak_value_inr": "2138750.00",
       "peak_approximate": true,
       "closing_value_inr": "2138750.00",
-      "gross_dividend_inr": "2077.50",
+      "gross_dividend_inr": "4618.25",
       "sale_proceeds_inr": "0.00",
       "needs_review": true,
       "review_note": "entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)",
@@ -37,9 +37,9 @@
           "figure": "Initial value",
           "source_currency": "USD",
           "source_amount": "6000.00",
-          "ttbr": "83.1000",
-          "rate_date": "2024-01-05",
-          "result_inr": "498600.00"
+          "ttbr": "83.2500",
+          "rate_date": "2024-03-15",
+          "result_inr": "499500.00"
         },
         {
           "figure": "Peak value",
@@ -61,9 +61,17 @@
           "figure": "Dividend",
           "source_currency": "USD",
           "source_amount": "25.00",
-          "ttbr": "83.1000",
-          "rate_date": "2024-01-05",
-          "result_inr": "2077.50"
+          "ttbr": "83.4500",
+          "rate_date": "2024-06-13",
+          "result_inr": "2086.25"
+        },
+        {
+          "figure": "Dividend",
+          "source_currency": "USD",
+          "source_amount": "30.00",
+          "ttbr": "84.4000",
+          "rate_date": "2024-09-12",
+          "result_inr": "2532.00"
         }
       ]
     },
@@ -73,38 +81,54 @@
       "entity_name": "MICROSOFT CORP",
       "nature": "Listed equity share",
       "acquired_on": "2024-02-01",
-      "initial_value_inr": "664800.00",
-      "peak_value_inr": "751950.00",
+      "initial_value_inr": "666890.00",
+      "peak_value_inr": "748490.00",
       "peak_approximate": true,
       "closing_value_inr": "0.00",
       "gross_dividend_inr": "0.00",
-      "sale_proceeds_inr": "751950.00",
+      "sale_proceeds_inr": "760995.00",
       "needs_review": true,
       "review_note": "entity address/ZIP missing (set via --entities)",
       "audit": [
         {
           "figure": "Initial value",
           "source_currency": "USD",
-          "source_amount": "8000.00",
-          "ttbr": "83.1000",
-          "rate_date": "2024-01-05",
-          "result_inr": "664800.00"
+          "source_amount": "4680.00",
+          "ttbr": "83.0500",
+          "rate_date": "2024-02-01",
+          "result_inr": "388674.00"
+        },
+        {
+          "figure": "Initial value",
+          "source_currency": "USD",
+          "source_amount": "3320.00",
+          "ttbr": "83.8000",
+          "rate_date": "2024-07-01",
+          "result_inr": "278216.00"
         },
         {
           "figure": "Peak value",
           "source_currency": "USD",
-          "source_amount": "9000.00",
-          "ttbr": "83.5500",
-          "rate_date": "2024-06-14",
-          "result_inr": "751950.00"
+          "source_amount": "8900.00",
+          "ttbr": "84.1000",
+          "rate_date": "2024-08-15",
+          "result_inr": "748490.00"
         },
         {
           "figure": "Sale proceeds",
           "source_currency": "USD",
-          "source_amount": "9000.00",
-          "ttbr": "83.5500",
-          "rate_date": "2024-06-14",
-          "result_inr": "751950.00"
+          "source_amount": "4450.00",
+          "ttbr": "84.1000",
+          "rate_date": "2024-08-15",
+          "result_inr": "374245.00"
+        },
+        {
+          "figure": "Sale proceeds",
+          "source_currency": "USD",
+          "source_amount": "4550.00",
+          "ttbr": "85.0000",
+          "rate_date": "2024-11-20",
+          "result_inr": "386750.00"
         }
       ]
     },
@@ -114,11 +138,11 @@
       "entity_name": "VANGUARD S\u0026P 500 ETF",
       "nature": "Exchange Traded Fund",
       "acquired_on": "2024-06-20",
-      "initial_value_inr": "417750.00",
+      "initial_value_inr": "418575.00",
       "peak_value_inr": "461970.00",
       "peak_approximate": true,
       "closing_value_inr": "461970.00",
-      "gross_dividend_inr": "1253.25",
+      "gross_dividend_inr": "2287.80",
       "sale_proceeds_inr": "0.00",
       "needs_review": true,
       "review_note": "entity address/ZIP missing (set via --entities)",
@@ -135,9 +159,9 @@
           "figure": "Initial value",
           "source_currency": "USD",
           "source_amount": "1500.00",
-          "ttbr": "83.5500",
-          "rate_date": "2024-06-14",
-          "result_inr": "125325.00"
+          "ttbr": "84.1000",
+          "rate_date": "2024-08-15",
+          "result_inr": "126150.00"
         },
         {
           "figure": "Peak value",
@@ -159,9 +183,17 @@
           "figure": "Dividend",
           "source_currency": "USD",
           "source_amount": "15.00",
-          "ttbr": "83.5500",
-          "rate_date": "2024-06-14",
-          "result_inr": "1253.25"
+          "ttbr": "84.6000",
+          "rate_date": "2024-09-25",
+          "result_inr": "1269.00"
+        },
+        {
+          "figure": "Dividend",
+          "source_currency": "USD",
+          "source_amount": "12.00",
+          "ttbr": "84.9000",
+          "rate_date": "2024-11-15",
+          "result_inr": "1018.80"
         }
       ]
     }

@@ -15,6 +15,7 @@ type htmlRenderer struct{}
 type htmlData struct {
 	Report jsonReport
 	Recon  recon
+	Audit  []htmlAuditRow
 }
 
 type recon struct {
@@ -23,6 +24,62 @@ type recon struct {
 	TotalClosing  string
 	TotalDividend string
 	TotalProceeds string
+}
+
+// htmlAuditRow is the per-security audit block. Its figures are grouped so the
+// figure label spans (rowspan) its conversion lines instead of repeating.
+type htmlAuditRow struct {
+	Index       int
+	EntityName  string
+	NeedsReview bool
+	ReviewNote  string
+	Groups      []auditGroup
+}
+
+type auditGroup struct {
+	Figure string
+	Lines  []auditLine
+}
+
+type auditLine struct {
+	Source   string
+	TTBR     string
+	RateDate string
+	Result   string
+}
+
+// groupsFor builds one group per Table A3 figure, always emitting all five so
+// the audit trail is complete and consistent with the Markdown output. A figure
+// with no FX conversions (e.g. a zero dividend) renders a single dashed line.
+func groupsFor(row schedulefa.A3Row) []auditGroup {
+	figs := []struct {
+		label string
+		amt   schedulefa.Amount
+	}{
+		{"Initial value", row.InitialValue},
+		{"Peak value", row.PeakValue},
+		{"Closing value", row.ClosingValue},
+		{"Dividend", row.GrossDividend},
+		{"Sale proceeds", row.SaleProceeds},
+	}
+	groups := make([]auditGroup, 0, len(figs))
+	for _, f := range figs {
+		g := auditGroup{Figure: f.label}
+		if len(f.amt.Audit) == 0 {
+			g.Lines = []auditLine{{Source: "—", TTBR: "—", RateDate: "—", Result: inr(f.amt.INR)}}
+		} else {
+			for _, c := range f.amt.Audit {
+				g.Lines = append(g.Lines, auditLine{
+					Source:   string(c.Source.Currency) + " " + money(ratOf(c.Source)),
+					TTBR:     rate(c.Rate),
+					RateDate: rateDate(c),
+					Result:   inr(c.Result),
+				})
+			}
+		}
+		groups = append(groups, g)
+	}
+	return groups
 }
 
 func (htmlRenderer) Render(w io.Writer, r *schedulefa.Report) error {
@@ -47,6 +104,15 @@ func (htmlRenderer) Render(w io.Writer, r *schedulefa.Report) error {
 			TotalDividend: money(tDiv),
 			TotalProceeds: money(tProc),
 		},
+	}
+	for i, row := range r.A3 {
+		data.Audit = append(data.Audit, htmlAuditRow{
+			Index:       i + 1,
+			EntityName:  row.EntityName,
+			NeedsReview: row.NeedsReview,
+			ReviewNote:  row.ReviewNote,
+			Groups:      groupsFor(row),
+		})
 	}
 	return htmlTemplate.Execute(w, data)
 }
@@ -148,16 +214,17 @@ const htmlSource = `<!doctype html>
 
 <h2>Audit trail</h2>
 <p class="disclaimer">Each INR figure and the SBI TTBR (rate date actually used) behind it.</p>
-{{range $i, $r := .Report.A3}}
+{{range .Audit}}
 <details open>
-  <summary>{{add $i 1}}. {{$r.EntityName}} {{if $r.NeedsReview}}<span class="flag">⚠︎</span>{{end}}
-    {{if $r.ReviewNote}}<span class="sub">— {{$r.ReviewNote}}</span>{{end}}</summary>
+  <summary>{{.Index}}. {{.EntityName}}{{if .NeedsReview}} <span class="flag">⚠︎</span>{{end}}{{if .ReviewNote}} <span class="sub">— {{.ReviewNote}}</span>{{end}}</summary>
   <table class="audit">
     <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
     <tbody>
-    {{range $r.Audit}}
-      <tr><td>{{.Figure}}</td><td>{{.Currency}} {{.SourceAmt}}</td><td class="num">{{.TTBR}}</td><td>{{.RateDate}}</td><td class="num">{{.ResultINR}}</td></tr>
-    {{end}}
+    {{- range .Groups}}{{$g := .}}
+      {{- range $j, $line := .Lines}}
+      <tr>{{if eq $j 0}}<td{{if gt (len $g.Lines) 1}} rowspan="{{len $g.Lines}}"{{end}}>{{$g.Figure}}</td>{{end}}<td>{{$line.Source}}</td><td class="num">{{$line.TTBR}}</td><td>{{$line.RateDate}}</td><td class="num">{{$line.Result}}</td></tr>
+      {{- end}}
+    {{- end}}
     </tbody>
   </table>
 </details>

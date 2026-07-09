@@ -46,9 +46,9 @@
   <tr><th>Address</th><td>One Pickwick Plaza, Greenwich, CT 06830 · country code 1</td></tr>
   <tr><th>Account number</th><td>U1234567</td></tr>
   <tr><th>Status / Opened</th><td>Owner · 2021-05-10</td></tr>
-  <tr><th>Peak balance</th><td>₹3352670.00</td></tr>
+  <tr><th>Peak balance</th><td>₹3349210.00</td></tr>
   <tr><th>Closing balance</th><td>₹2600720.00</td></tr>
-  <tr><th>Gross credited</th><td>₹3330.75</td></tr>
+  <tr><th>Gross credited</th><td>₹6906.05</td></tr>
 </table>
 <p class="review">⚠︎ peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included</p>
 
@@ -67,10 +67,10 @@
       <td>APPLE INC</td>
       <td>United States of America (1)</td>
       <td>2023-01-10</td>
-      <td class="num">498600.00</td>
+      <td class="num">499500.00</td>
       <td class="num">2138750.00</td>
       <td class="num">2138750.00</td>
-      <td class="num">2077.50</td>
+      <td class="num">4618.25</td>
       <td class="num">0.00</td>
       <td><span class="flag">⚠︎</span></td>
     </tr>
@@ -80,11 +80,11 @@
       <td>MICROSOFT CORP</td>
       <td>United States of America (1)</td>
       <td>2024-02-01</td>
-      <td class="num">664800.00</td>
-      <td class="num">751950.00</td>
+      <td class="num">666890.00</td>
+      <td class="num">748490.00</td>
       <td class="num">0.00</td>
       <td class="num">0.00</td>
-      <td class="num">751950.00</td>
+      <td class="num">760995.00</td>
       <td><span class="flag">⚠︎</span></td>
     </tr>
   
@@ -93,10 +93,10 @@
       <td>VANGUARD S&amp;P 500 ETF</td>
       <td>United States of America (1)</td>
       <td>2024-06-20</td>
-      <td class="num">417750.00</td>
+      <td class="num">418575.00</td>
       <td class="num">461970.00</td>
       <td class="num">461970.00</td>
-      <td class="num">1253.25</td>
+      <td class="num">2287.80</td>
       <td class="num">0.00</td>
       <td><span class="flag">⚠︎</span></td>
     </tr>
@@ -109,66 +109,56 @@
   <tr><th>Securities (A3 rows)</th><td>3</td></tr>
   <tr><th>Rows needing review</th><td>3</td></tr>
   <tr><th>Total closing value</th><td>₹2600720.00</td></tr>
-  <tr><th>Total gross dividend</th><td>₹3330.75</td></tr>
-  <tr><th>Total sale proceeds</th><td>₹751950.00</td></tr>
+  <tr><th>Total gross dividend</th><td>₹6906.05</td></tr>
+  <tr><th>Total sale proceeds</th><td>₹760995.00</td></tr>
 </table>
 
 <h2>Audit trail</h2>
 <p class="disclaimer">Each INR figure and the SBI TTBR (rate date actually used) behind it.</p>
 
 <details open>
-  <summary>1. APPLE INC <span class="flag">⚠︎</span>
-    <span class="sub">— entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)</span></summary>
+  <summary>1. APPLE INC <span class="flag">⚠︎</span> <span class="sub">— entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)</span></summary>
   <table class="audit">
     <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
     <tbody>
-    
-      <tr><td>Initial value</td><td>USD 6000.00</td><td class="num">83.1000</td><td>2024-01-05</td><td class="num">498600.00</td></tr>
-    
+      <tr><td>Initial value</td><td>USD 6000.00</td><td class="num">83.2500</td><td>2024-03-15</td><td class="num">499500.00</td></tr>
       <tr><td>Peak value</td><td>USD 25000.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">2138750.00</td></tr>
-    
       <tr><td>Closing value</td><td>USD 25000.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">2138750.00</td></tr>
-    
-      <tr><td>Dividend</td><td>USD 25.00</td><td class="num">83.1000</td><td>2024-01-05</td><td class="num">2077.50</td></tr>
-    
+      <tr><td rowspan="2">Dividend</td><td>USD 25.00</td><td class="num">83.4500</td><td>2024-06-13</td><td class="num">2086.25</td></tr>
+      <tr><td>USD 30.00</td><td class="num">84.4000</td><td>2024-09-12</td><td class="num">2532.00</td></tr>
+      <tr><td>Sale proceeds</td><td>—</td><td class="num">—</td><td>—</td><td class="num">0.00</td></tr>
     </tbody>
   </table>
 </details>
 
 <details open>
-  <summary>2. MICROSOFT CORP <span class="flag">⚠︎</span>
-    <span class="sub">— entity address/ZIP missing (set via --entities)</span></summary>
+  <summary>2. MICROSOFT CORP <span class="flag">⚠︎</span> <span class="sub">— entity address/ZIP missing (set via --entities)</span></summary>
   <table class="audit">
     <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
     <tbody>
-    
-      <tr><td>Initial value</td><td>USD 8000.00</td><td class="num">83.1000</td><td>2024-01-05</td><td class="num">664800.00</td></tr>
-    
-      <tr><td>Peak value</td><td>USD 9000.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">751950.00</td></tr>
-    
-      <tr><td>Sale proceeds</td><td>USD 9000.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">751950.00</td></tr>
-    
+      <tr><td rowspan="2">Initial value</td><td>USD 4680.00</td><td class="num">83.0500</td><td>2024-02-01</td><td class="num">388674.00</td></tr>
+      <tr><td>USD 3320.00</td><td class="num">83.8000</td><td>2024-07-01</td><td class="num">278216.00</td></tr>
+      <tr><td>Peak value</td><td>USD 8900.00</td><td class="num">84.1000</td><td>2024-08-15</td><td class="num">748490.00</td></tr>
+      <tr><td>Closing value</td><td>—</td><td class="num">—</td><td>—</td><td class="num">0.00</td></tr>
+      <tr><td>Dividend</td><td>—</td><td class="num">—</td><td>—</td><td class="num">0.00</td></tr>
+      <tr><td rowspan="2">Sale proceeds</td><td>USD 4450.00</td><td class="num">84.1000</td><td>2024-08-15</td><td class="num">374245.00</td></tr>
+      <tr><td>USD 4550.00</td><td class="num">85.0000</td><td>2024-11-20</td><td class="num">386750.00</td></tr>
     </tbody>
   </table>
 </details>
 
 <details open>
-  <summary>3. VANGUARD S&amp;P 500 ETF <span class="flag">⚠︎</span>
-    <span class="sub">— entity address/ZIP missing (set via --entities)</span></summary>
+  <summary>3. VANGUARD S&amp;P 500 ETF <span class="flag">⚠︎</span> <span class="sub">— entity address/ZIP missing (set via --entities)</span></summary>
   <table class="audit">
     <thead><tr><th>Figure</th><th>Source</th><th class="num">TTBR</th><th>Rate date</th><th class="num">INR</th></tr></thead>
     <tbody>
-    
-      <tr><td>Initial value</td><td>USD 3500.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">292425.00</td></tr>
-    
-      <tr><td>Initial value</td><td>USD 1500.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">125325.00</td></tr>
-    
+      <tr><td rowspan="2">Initial value</td><td>USD 3500.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">292425.00</td></tr>
+      <tr><td>USD 1500.00</td><td class="num">84.1000</td><td>2024-08-15</td><td class="num">126150.00</td></tr>
       <tr><td>Peak value</td><td>USD 5400.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">461970.00</td></tr>
-    
       <tr><td>Closing value</td><td>USD 5400.00</td><td class="num">85.5500</td><td>2024-12-31</td><td class="num">461970.00</td></tr>
-    
-      <tr><td>Dividend</td><td>USD 15.00</td><td class="num">83.5500</td><td>2024-06-14</td><td class="num">1253.25</td></tr>
-    
+      <tr><td rowspan="2">Dividend</td><td>USD 15.00</td><td class="num">84.6000</td><td>2024-09-25</td><td class="num">1269.00</td></tr>
+      <tr><td>USD 12.00</td><td class="num">84.9000</td><td>2024-11-15</td><td class="num">1018.80</td></tr>
+      <tr><td>Sale proceeds</td><td>—</td><td class="num">—</td><td>—</td><td class="num">0.00</td></tr>
     </tbody>
   </table>
 </details>

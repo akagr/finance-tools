@@ -74,21 +74,22 @@ func TestParseFlexFile(t *testing.T) {
 		t.Errorf("AAPL earliest lot = %v, want 2023-01-10", got)
 	}
 
-	// Trades: 4 in-year (2 buys, 1 buy, 1 sell). Quantities are absolute.
-	if len(st.Trades) != 4 {
-		t.Fatalf("trades = %d, want 4", len(st.Trades))
+	// Trades: 7 in-year (AAPL buy; VOO two buys; MSFT two buys + two sells).
+	// Quantities are absolute.
+	if len(st.Trades) != 7 {
+		t.Fatalf("trades = %d, want 7", len(st.Trades))
 	}
 	sell := findTrade(t, st, "MSFT", model.Sell)
-	if !ratEq(sell.Quantity, big.NewRat(20, 1)) {
-		t.Errorf("MSFT sell qty = %s, want 20", sell.Quantity.RatString())
+	if !ratEq(sell.Quantity, big.NewRat(10, 1)) {
+		t.Errorf("MSFT sell qty = %s, want 10", sell.Quantity.RatString())
 	}
-	if !ratEq(sell.Proceeds.Amount, big.NewRat(9000, 1)) {
-		t.Errorf("MSFT sell proceeds = %s, want 9000", sell.Proceeds.Amount.RatString())
+	if !ratEq(sell.Proceeds.Amount, big.NewRat(4450, 1)) {
+		t.Errorf("MSFT sell proceeds = %s, want 4450", sell.Proceeds.Amount.RatString())
 	}
 
-	// Dividends: 2 in-year (AAPL, VOO); the 2025-01-02 row is filtered out.
-	if len(st.Dividends) != 2 {
-		t.Fatalf("dividends = %d, want 2 (out-of-year row must be excluded)", len(st.Dividends))
+	// Dividends: 4 in-year (AAPL ×2, VOO ×2); the 2025-01-02 row is filtered out.
+	if len(st.Dividends) != 4 {
+		t.Fatalf("dividends = %d, want 4 (out-of-year row must be excluded)", len(st.Dividends))
 	}
 	div := findDividend(t, st, "AAPL")
 	if !ratEq(div.Gross.Amount, big.NewRat(25, 1)) {
