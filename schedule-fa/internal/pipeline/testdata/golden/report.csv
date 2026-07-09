@@ -1,4 +1,4 @@
 country_name,country_code,entity_name,address,zip,nature,acquired_on,initial_value_inr,peak_value_inr,closing_value_inr,gross_dividend_inr,sale_proceeds_inr,peak_approximate,needs_review,review_note
-United States of America,1,APPLE INC,,,Listed equity share,2023-01-10,499500.00,2138750.00,2138750.00,4618.25,0.00,true,true,entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)
-United States of America,1,MICROSOFT CORP,,,Listed equity share,2024-02-01,666890.00,748490.00,0.00,0.00,760995.00,true,true,entity address/ZIP missing (set via --entities)
-United States of America,1,VANGUARD S&P 500 ETF,,,Exchange Traded Fund,2024-06-20,418575.00,461970.00,461970.00,2287.80,0.00,true,true,entity address/ZIP missing (set via --entities)
+United States of America,1,Apple Inc.,"One Apple Park Way, Cupertino, CA, USA",95014,Company (listed),2023-01-10,499500.00,2138750.00,2138750.00,4618.25,0.00,true,true,1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)
+United States of America,1,Microsoft Corporation,"One Microsoft Way, Redmond, WA, USA",98052,Company (listed),2024-02-01,666890.00,748490.00,0.00,0.00,760995.00,true,false,
+United States of America,1,Vanguard S&P 500 ETF (Vanguard Group Inc.),"100 Vanguard Blvd, Malvern, PA, USA",19355,Fund (ETF),2024-06-20,418575.00,461970.00,461970.00,2287.80,0.00,true,false,

@@ -21,8 +21,10 @@
     {
       "country_name": "United States of America",
       "country_code": "1",
-      "entity_name": "APPLE INC",
-      "nature": "Listed equity share",
+      "entity_name": "Apple Inc.",
+      "address": "One Apple Park Way, Cupertino, CA, USA",
+      "zip": "95014",
+      "nature": "Company (listed)",
       "acquired_on": "2023-01-10",
       "initial_value_inr": "499500.00",
       "peak_value_inr": "2138750.00",
@@ -31,7 +33,7 @@
       "gross_dividend_inr": "4618.25",
       "sale_proceeds_inr": "0.00",
       "needs_review": true,
-      "review_note": "entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)",
+      "review_note": "1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)",
       "audit": [
         {
           "figure": "Initial value",
@@ -78,8 +80,10 @@
     {
       "country_name": "United States of America",
       "country_code": "1",
-      "entity_name": "MICROSOFT CORP",
-      "nature": "Listed equity share",
+      "entity_name": "Microsoft Corporation",
+      "address": "One Microsoft Way, Redmond, WA, USA",
+      "zip": "98052",
+      "nature": "Company (listed)",
       "acquired_on": "2024-02-01",
       "initial_value_inr": "666890.00",
       "peak_value_inr": "748490.00",
@@ -87,8 +91,7 @@
       "closing_value_inr": "0.00",
       "gross_dividend_inr": "0.00",
       "sale_proceeds_inr": "760995.00",
-      "needs_review": true,
-      "review_note": "entity address/ZIP missing (set via --entities)",
+      "needs_review": false,
       "audit": [
         {
           "figure": "Initial value",
@@ -135,8 +138,10 @@
     {
       "country_name": "United States of America",
       "country_code": "1",
-      "entity_name": "VANGUARD S\u0026P 500 ETF",
-      "nature": "Exchange Traded Fund",
+      "entity_name": "Vanguard S\u0026P 500 ETF (Vanguard Group Inc.)",
+      "address": "100 Vanguard Blvd, Malvern, PA, USA",
+      "zip": "19355",
+      "nature": "Fund (ETF)",
       "acquired_on": "2024-06-20",
       "initial_value_inr": "418575.00",
       "peak_value_inr": "461970.00",
@@ -144,8 +149,7 @@
       "closing_value_inr": "461970.00",
       "gross_dividend_inr": "2287.80",
       "sale_proceeds_inr": "0.00",
-      "needs_review": true,
-      "review_note": "entity address/ZIP missing (set via --entities)",
+      "needs_review": false,
       "audit": [
         {
           "figure": "Initial value",

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/akagr/finance-tools/schedule-fa/internal/entities"
 	"github.com/akagr/finance-tools/schedule-fa/internal/fx"
 	"github.com/akagr/finance-tools/schedule-fa/internal/ibkr"
 	"github.com/akagr/finance-tools/schedule-fa/internal/model"
@@ -20,6 +21,10 @@ var update = flag.Bool("update", false, "update golden files")
 // with SBI TTBR, compute the approximate peak, build Tables A2/A3, and render —
 // against checked-in golden output. Inputs are the synthetic fixtures from the
 // ibkr and fx packages (no real data, mode C so the result is deterministic).
+// Entity overrides are supplied for all three issuers, so the report exercises
+// both fully clean rows (MSFT, VOO) and a row that still needs review despite
+// complete metadata because of a genuine data gap (AAPL: a forward split plus a
+// pre-history acquisition date with no TTBR).
 func TestGoldenOfflineReport(t *testing.T) {
 	st, err := ibkr.ParseFlexFile("../ibkr/testdata/sample_flex.xml", 2024)
 	if err != nil {
@@ -29,8 +34,12 @@ func TestGoldenOfflineReport(t *testing.T) {
 	if err := store.LoadRateKeeperFile(model.USD, "../fx/testdata/SBI_REFERENCE_RATES_USD.csv"); err != nil {
 		t.Fatalf("rates: %v", err)
 	}
+	ents, err := entities.Load("testdata/entities.csv")
+	if err != nil {
+		t.Fatalf("entities: %v", err)
+	}
 
-	res, err := BuildReport(st, store, nil, nil) // mode C, no entity overrides
+	res, err := BuildReport(st, store, nil, ents) // mode C, with entity overrides
 	if err != nil {
 		t.Fatalf("build: %v", err)
 	}

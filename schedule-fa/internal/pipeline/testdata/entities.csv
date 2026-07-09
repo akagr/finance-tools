@@ -1,0 +1,4 @@
+isin,symbol,entity_name,address,zip,country_code,nature
+US0378331005,AAPL,Apple Inc.,"One Apple Park Way, Cupertino, CA, USA",95014,1,Company (listed)
+US5949181045,MSFT,Microsoft Corporation,"One Microsoft Way, Redmond, WA, USA",98052,1,Company (listed)
+US9229083632,VOO,Vanguard S&P 500 ETF (Vanguard Group Inc.),"100 Vanguard Blvd, Malvern, PA, USA",19355,1,Fund (ETF)

@@ -14,14 +14,14 @@
 
 | # | Entity | Country (code) | Acquired | Initial (INR) | Peak (INR) | Closing (INR) | Dividend (INR) | Proceeds (INR) | Review |
 |---|--------|----------------|----------|--------------:|-----------:|--------------:|---------------:|---------------:|:------:|
-| 1 | APPLE INC | United States of America (1) | 2023-01-10 | 499500.00 | 2138750.00 | 2138750.00 | 4618.25 | 0.00 | ⚠︎ |
-| 2 | MICROSOFT CORP | United States of America (1) | 2024-02-01 | 666890.00 | 748490.00 | 0.00 | 0.00 | 760995.00 | ⚠︎ |
-| 3 | VANGUARD S&P 500 ETF | United States of America (1) | 2024-06-20 | 418575.00 | 461970.00 | 461970.00 | 2287.80 | 0.00 | ⚠︎ |
+| 1 | Apple Inc. | United States of America (1) | 2023-01-10 | 499500.00 | 2138750.00 | 2138750.00 | 4618.25 | 0.00 | ⚠︎ |
+| 2 | Microsoft Corporation | United States of America (1) | 2024-02-01 | 666890.00 | 748490.00 | 0.00 | 0.00 | 760995.00 |  |
+| 3 | Vanguard S&P 500 ETF (Vanguard Group Inc.) | United States of America (1) | 2024-06-20 | 418575.00 | 461970.00 | 461970.00 | 2287.80 | 0.00 |  |
 
 ## Reconciliation
 
 - Securities (A3 rows): **3**
-- Rows needing manual review: **3**
+- Rows needing manual review: **1**
 - Total closing value: **₹2600720.00**
 - Total gross dividend: **₹6906.05**
 - Total sale proceeds: **₹760995.00**
@@ -30,9 +30,9 @@
 
 Each INR figure and the SBI TTBR (rate date actually used) behind it.
 
-### 1. APPLE INC
+### 1. Apple Inc.
 
-_Review: entity address/ZIP missing (set via --entities); 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)_
+_Review: 1 corporate action(s) in year — verify quantity/cost basis; fx: no USD TTBR on or before 2023-01-10 (earliest available is 2024-01-05)_
 
 | Figure | Source | TTBR | Rate date | INR |
 |--------|--------|-----:|-----------|----:|
@@ -43,9 +43,7 @@ _Review: entity address/ZIP missing (set via --entities); 1 corporate action(s) 
 |  | USD 30.00 | 84.4000 | 2024-09-12 | 2532.00 |
 | Sale proceeds | — | — | — | 0.00 |
 
-### 2. MICROSOFT CORP
-
-_Review: entity address/ZIP missing (set via --entities)_
+### 2. Microsoft Corporation
 
 | Figure | Source | TTBR | Rate date | INR |
 |--------|--------|-----:|-----------|----:|
@@ -57,9 +55,7 @@ _Review: entity address/ZIP missing (set via --entities)_
 | Sale proceeds | USD 4450.00 | 84.1000 | 2024-08-15 | 374245.00 |
 |  | USD 4550.00 | 85.0000 | 2024-11-20 | 386750.00 |
 
-### 3. VANGUARD S&P 500 ETF
-
-_Review: entity address/ZIP missing (set via --entities)_
+### 3. Vanguard S&P 500 ETF (Vanguard Group Inc.)
 
 | Figure | Source | TTBR | Rate date | INR |
 |--------|--------|-----:|-----------|----:|
