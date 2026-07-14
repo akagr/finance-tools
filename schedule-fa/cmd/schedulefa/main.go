@@ -253,7 +253,7 @@ func cmdFetchPrices(args []string) int {
 	fs := flag.NewFlagSet("fetch-prices", flag.ExitOnError)
 	var (
 		year     = fs.Int("year", 0, "CALENDAR year to fetch prices for (Jan 1 – Dec 31), e.g. 2026")
-		tickersP = fs.String("tickers", "scripts/tickers.txt", "tickers file: lines of '<symbol> <yahoo-symbol> <isin> [currency]'")
+		tickersP = fs.String("tickers", "data/prices/tickers.txt", "tickers file: lines of '<symbol> <yahoo-symbol> <isin> [currency]'")
 		out      = fs.String("out", "", "output CSV path (default: data/prices/prices-<year>.csv)")
 	)
 	fs.Parse(args)

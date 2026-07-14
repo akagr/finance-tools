@@ -189,7 +189,7 @@ func cmdFetchPrices(args []string) int {
 	var (
 		start    = fs.String("start", "", "start date YYYY-MM-DD (inclusive)")
 		end      = fs.String("end", "", "end date YYYY-MM-DD (inclusive)")
-		tickersP = fs.String("tickers", "scripts/tickers.txt", "tickers file: lines of '<label> <yahoo-symbol> [currency]'")
+		tickersP = fs.String("tickers", "data/tickers.txt", "tickers file: lines of '<label> <yahoo-symbol> [currency]'")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2

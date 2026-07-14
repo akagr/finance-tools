@@ -26,10 +26,10 @@ sum (the run reports this).
 Use the helper, which pulls from the Yahoo Finance chart API (no key) and writes this format:
 
 ```sh
-./schedulefa fetch-prices --year <year>   # reads scripts/tickers.txt by default
+./schedulefa fetch-prices --year <year>   # reads data/prices/tickers.txt by default
 ```
 
-Edit `scripts/tickers.txt` (one line per holding: `symbol  yahoo-symbol  isin  [currency]`).
+Edit `data/prices/tickers.txt` (one line per holding: `symbol  yahoo-symbol  isin  [currency]`).
 Yahoo symbols: US tickers are plain (e.g. `IBKR`); LSE uses `.L` (e.g. `VWRA.L`, the USD
 line — `VWRP.L` is the GBP line). It writes the **raw** close (not adjusted) to
 `data/prices/prices-<year>.csv` (override with `--tickers` / `--out`).

@@ -13,14 +13,14 @@ your holdings never leave your machine.
 ```sh
 cd correlation
 
-# 1. Fetch daily closes for the assets in scripts/tickers.txt (Yahoo Finance).
+# 1. Fetch daily closes for the assets in data/tickers.txt (Yahoo Finance).
 go run ./cmd/correlation fetch prices --start 2020-01-01 --end 2024-12-31 > data/prices.csv
 
 # 2. Correlate them (weekly log returns, printed as Markdown).
 go run ./cmd/correlation compute --prices data/prices.csv
 ```
 
-Add more assets by editing `scripts/tickers.txt` (any number of symbols).
+Add more assets by editing `data/tickers.txt` (any number of symbols).
 
 ### Comparing across currencies (e.g. USD ETF vs INR index)
 
