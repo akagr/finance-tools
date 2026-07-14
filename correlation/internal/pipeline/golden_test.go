@@ -75,3 +75,18 @@ func TestGoldenBaseINR(t *testing.T) {
 	checkGolden(t, "base_inr.md", render(t, opts, "md"))
 	checkGolden(t, "base_inr.json", render(t, opts, "json"))
 }
+
+// Rolling mode: a short trailing window over the native series, exercising the
+// rolling-correlation block in every render format.
+func TestGoldenRolling(t *testing.T) {
+	opts := Options{
+		PricesPath:      filepath.Join(fixtures, "prices.csv"),
+		DefaultCurrency: "USD",
+		Frequency:       "weekly",
+		ReturnKind:      "log",
+		RollingWindow:   4,
+	}
+	checkGolden(t, "rolling.md", render(t, opts, "md"))
+	checkGolden(t, "rolling.csv", render(t, opts, "csv"))
+	checkGolden(t, "rolling.json", render(t, opts, "json"))
+}

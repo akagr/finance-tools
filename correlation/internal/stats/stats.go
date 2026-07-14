@@ -8,6 +8,7 @@ package stats
 
 import (
 	"errors"
+	"fmt"
 	"math"
 )
 
@@ -130,6 +131,97 @@ func Compute(labels []string, series [][]float64) (Result, error) {
 		Stdev:       stdev,
 		Pairs:       pairs,
 	}, nil
+}
+
+// RollingPair holds the time-varying correlation between two assets over a
+// sliding window. Values[k] is the Pearson r computed on the window of returns
+// ending at return index EndIdx[k] (inclusive), i.e. the last Window returns up
+// to and including that observation. A NaN entry means the window was
+// degenerate (an asset was constant across it).
+type RollingPair struct {
+	I, J   int
+	A, B   string
+	Window int
+	EndIdx []int     // return-observation index at the right edge of each window
+	Values []float64 // rolling Pearson r, one per window position
+}
+
+// Rolling computes a sliding-window Pearson correlation for every unique i<j
+// pair. window is the number of return observations per window; it must be at
+// least 2 and no larger than the number of observations. The first window ends
+// at index window-1, then it slides forward one observation at a time, so the
+// output has obs-window+1 positions per pair.
+func Rolling(labels []string, series [][]float64, window int) ([]RollingPair, error) {
+	n := len(series)
+	if n < 2 {
+		return nil, errors.New("stats: need at least two assets")
+	}
+	if len(labels) != n {
+		return nil, errors.New("stats: labels and series length mismatch")
+	}
+	obs := len(series[0])
+	for _, s := range series {
+		if len(s) != obs {
+			return nil, errors.New("stats: return series have unequal length")
+		}
+	}
+	if window < 2 {
+		return nil, errors.New("stats: rolling window must be >= 2")
+	}
+	if window > obs {
+		return nil, fmt.Errorf("stats: rolling window %d exceeds %d observations", window, obs)
+	}
+
+	positions := obs - window + 1
+	endIdx := make([]int, positions)
+	for p := 0; p < positions; p++ {
+		endIdx[p] = p + window - 1
+	}
+
+	var out []RollingPair
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			vals := make([]float64, positions)
+			for p := 0; p < positions; p++ {
+				start := p
+				end := p + window // exclusive
+				vals[p] = windowCorr(series[i][start:end], series[j][start:end])
+			}
+			out = append(out, RollingPair{
+				I: i, J: j,
+				A: labels[i], B: labels[j],
+				Window: window,
+				EndIdx: endIdx,
+				Values: vals,
+			})
+		}
+	}
+	return out, nil
+}
+
+// windowCorr computes Pearson r over two equal-length slices, returning NaN if
+// either slice is constant.
+func windowCorr(a, b []float64) float64 {
+	m := len(a)
+	var ma, mb float64
+	for k := 0; k < m; k++ {
+		ma += a[k]
+		mb += b[k]
+	}
+	ma /= float64(m)
+	mb /= float64(m)
+	var sab, saa, sbb float64
+	for k := 0; k < m; k++ {
+		da := a[k] - ma
+		db := b[k] - mb
+		sab += da * db
+		saa += da * da
+		sbb += db * db
+	}
+	if saa == 0 || sbb == 0 {
+		return math.NaN()
+	}
+	return clampCorr(sab / math.Sqrt(saa*sbb))
 }
 
 // clampCorr guards against tiny floating-point excursions past ±1.

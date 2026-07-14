@@ -1,0 +1,92 @@
+{
+  "frequency": "weekly",
+  "return_kind": "log",
+  "start": "2024-01-05",
+  "end": "2024-03-01",
+  "observations": 8,
+  "assets": [
+    {
+      "label": "VWRA",
+      "currency": "USD",
+      "converted": false
+    },
+    {
+      "label": "^NSEI",
+      "currency": "INR",
+      "converted": false
+    }
+  ],
+  "labels": [
+    "VWRA",
+    "^NSEI"
+  ],
+  "correlation": [
+    [
+      1,
+      0.516311
+    ],
+    [
+      0.516311,
+      1
+    ]
+  ],
+  "covariance": [
+    [
+      0.000064,
+      0.000035
+    ],
+    [
+      0.000035,
+      0.000072
+    ]
+  ],
+  "mean_return": [
+    0.008879,
+    0.006549
+  ],
+  "stdev": [
+    0.008025,
+    0.008513
+  ],
+  "annualised_volatility": [
+    0.057868,
+    0.061389
+  ],
+  "pairs": [
+    {
+      "a": "VWRA",
+      "b": "^NSEI",
+      "r": 0.516311,
+      "ci95_lo": -0.296088,
+      "ci95_hi": 0.895261
+    }
+  ],
+  "rolling": {
+    "window": 4,
+    "dates": [
+      "2024-02-02",
+      "2024-02-09",
+      "2024-02-16",
+      "2024-02-23",
+      "2024-03-01"
+    ],
+    "pairs": [
+      {
+        "a": "VWRA",
+        "b": "^NSEI",
+        "values": [
+          0.111919,
+          0.317166,
+          0.300821,
+          0.381834,
+          0.451307
+        ]
+      }
+    ]
+  },
+  "notes": [
+    "Native mode with mixed currencies (INR, USD): these correlations blend asset and FX co-movement. Pass --base-currency (with --fx) to normalise to one currency.",
+    "Small sample: only 8 weekly return observations. Correlations are noisy; prefer a longer window or a lower frequency.",
+    "Rolling window is only 4 observations: each rolling r is noisy and its jitter can look like real regime change. Read the trend, not single points."
+  ]
+}

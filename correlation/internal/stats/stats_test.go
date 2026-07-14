@@ -120,3 +120,77 @@ func TestComputeValidation(t *testing.T) {
 		t.Error("want error for unequal length")
 	}
 }
+
+func TestRollingSlidesAndMatchesFullWindow(t *testing.T) {
+	x := []float64{1, 2, 3, 4, 5, 6}
+	y := []float64{2, 1, 5, 3, 8, 7}
+	// window == len => single position, equal to the full-sample correlation.
+	full, err := Compute([]string{"x", "y"}, [][]float64{x, y})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roll, err := Rolling([]string{"x", "y"}, [][]float64{x, y}, len(x))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roll) != 1 {
+		t.Fatalf("pairs = %d, want 1", len(roll))
+	}
+	if got := len(roll[0].Values); got != 1 {
+		t.Fatalf("positions = %d, want 1", got)
+	}
+	approx(t, roll[0].Values[0], full.Correlation[0][1])
+	if roll[0].EndIdx[0] != len(x)-1 {
+		t.Fatalf("EndIdx = %d, want %d", roll[0].EndIdx[0], len(x)-1)
+	}
+
+	// window 3 over 6 obs => 4 sliding positions, ending at indices 2..5.
+	roll3, err := Rolling([]string{"x", "y"}, [][]float64{x, y}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(roll3[0].Values); got != 4 {
+		t.Fatalf("positions = %d, want 4", got)
+	}
+	wantEnd := []int{2, 3, 4, 5}
+	for i, e := range wantEnd {
+		if roll3[0].EndIdx[i] != e {
+			t.Fatalf("EndIdx[%d] = %d, want %d", i, roll3[0].EndIdx[i], e)
+		}
+	}
+	// Each rolling value must equal the plain correlation of its window slice.
+	for p := 0; p < 4; p++ {
+		sub, err := Compute([]string{"x", "y"}, [][]float64{x[p : p+3], y[p : p+3]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		approx(t, roll3[0].Values[p], sub.Correlation[0][1])
+	}
+}
+
+func TestRollingConstantWindowIsNaN(t *testing.T) {
+	x := []float64{1, 1, 1, 2}
+	y := []float64{5, 6, 7, 8}
+	roll, err := Rolling([]string{"x", "y"}, [][]float64{x, y}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// First window of x is constant (1,1,1) => NaN.
+	if !math.IsNaN(roll[0].Values[0]) {
+		t.Fatalf("want NaN for constant window, got %v", roll[0].Values[0])
+	}
+	if math.IsNaN(roll[0].Values[1]) {
+		t.Fatalf("second window should be defined, got NaN")
+	}
+}
+
+func TestRollingWindowBounds(t *testing.T) {
+	x := []float64{1, 2, 3}
+	y := []float64{3, 2, 1}
+	if _, err := Rolling([]string{"x", "y"}, [][]float64{x, y}, 1); err == nil {
+		t.Fatal("window < 2 should error")
+	}
+	if _, err := Rolling([]string{"x", "y"}, [][]float64{x, y}, 4); err == nil {
+		t.Fatal("window > obs should error")
+	}
+}

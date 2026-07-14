@@ -26,7 +26,8 @@ type Report struct {
 	Stdev       []float64 // per-asset per-period stdev
 	AnnVol      []float64 // per-asset annualised volatility
 	Pairs       []Pair
-	N           int // number of return observations
+	Rolling     Rolling // zero-valued unless rolling correlation was requested
+	N           int     // number of return observations
 }
 
 // Meta captures how the analysis was produced.
@@ -53,6 +54,21 @@ type Pair struct {
 	R      float64
 	CI95Lo float64
 	CI95Hi float64
+}
+
+// RollingPair is one pair's time-varying correlation, aligned to Rolling.Dates.
+type RollingPair struct {
+	A, B   string
+	Values []float64 // rolling r per window position; NaN where undefined
+}
+
+// Rolling holds the rolling-correlation block: a shared date axis (the period-
+// end date at the right edge of each window) plus one series per pair. It is
+// zero-valued (Window==0, no pairs) when rolling correlation was not requested.
+type Rolling struct {
+	Window int         // window length in return observations
+	Dates  []time.Time // right-edge period-end date of each window position
+	Pairs  []RollingPair
 }
 
 const disclaimer = "NOTE: not investment advice. Correlations are backward-looking, sample-dependent, and unstable in crises (they often rise toward 1 exactly when diversification is needed most)."
@@ -156,6 +172,31 @@ func renderMarkdown(w io.Writer, r Report) error {
 			[]string{"Pair", "r", "95% CI"},
 			pairRows,
 			[]mdAlign{alignLeft, alignRight, alignLeft})
+		b.WriteByte('\n')
+	}
+
+	// Rolling correlation over time.
+	if r.Rolling.Window > 0 && len(r.Rolling.Dates) > 0 && len(r.Rolling.Pairs) > 0 {
+		fmt.Fprintf(&b, "## Rolling correlation (window = %d %s returns)\n\n",
+			r.Rolling.Window, r.Meta.Frequency)
+		b.WriteString("Each column is the Pearson r over the trailing window ending on that date; watch how it drifts (and tends toward 1 in stress) rather than the single full-sample number above.\n\n")
+		header := make([]string, 0, len(r.Rolling.Dates)+1)
+		header = append(header, "Pair (window end →)")
+		aligns := make([]mdAlign, 1, len(r.Rolling.Dates)+1)
+		for _, d := range r.Rolling.Dates {
+			header = append(header, d.Format("2006-01-02"))
+			aligns = append(aligns, alignRight)
+		}
+		rollRows := make([][]string, len(r.Rolling.Pairs))
+		for i, rp := range r.Rolling.Pairs {
+			row := make([]string, 0, len(rp.Values)+1)
+			row = append(row, rp.A+" \u2013 "+rp.B)
+			for _, v := range rp.Values {
+				row = append(row, f4(v))
+			}
+			rollRows[i] = row
+		}
+		mdTable(&b, header, rollRows, aligns)
 		b.WriteByte('\n')
 	}
 
@@ -274,6 +315,36 @@ func renderCSV(w io.Writer, r Report) error {
 			return err
 		}
 	}
+
+	// Rolling correlation block: blank separator row, a header of window-end
+	// dates, then one row per pair.
+	if r.Rolling.Window > 0 && len(r.Rolling.Dates) > 0 && len(r.Rolling.Pairs) > 0 {
+		if err := cw.Write([]string{}); err != nil {
+			return err
+		}
+		rollHeader := make([]string, 0, len(r.Rolling.Dates)+1)
+		rollHeader = append(rollHeader, "rolling_pair")
+		for _, d := range r.Rolling.Dates {
+			rollHeader = append(rollHeader, d.Format("2006-01-02"))
+		}
+		if err := cw.Write(rollHeader); err != nil {
+			return err
+		}
+		for _, rp := range r.Rolling.Pairs {
+			row := make([]string, 0, len(rp.Values)+1)
+			row = append(row, rp.A+" - "+rp.B)
+			for _, v := range rp.Values {
+				if math.IsNaN(v) || math.IsInf(v, 0) {
+					row = append(row, "")
+				} else {
+					row = append(row, strconv.FormatFloat(round6(v), 'f', -1, 64))
+				}
+			}
+			if err := cw.Write(row); err != nil {
+				return err
+			}
+		}
+	}
 	cw.Flush()
 	return cw.Error()
 }
@@ -321,6 +392,16 @@ func renderJSON(w io.Writer, r Report) error {
 		CI95Lo jsonFloat `json:"ci95_lo"`
 		CI95Hi jsonFloat `json:"ci95_hi"`
 	}
+	type jsonRollingPair struct {
+		A      string      `json:"a"`
+		B      string      `json:"b"`
+		Values []jsonFloat `json:"values"`
+	}
+	type jsonRolling struct {
+		Window int               `json:"window"`
+		Dates  []string          `json:"dates"`
+		Pairs  []jsonRollingPair `json:"pairs"`
+	}
 	type jsonReport struct {
 		Frequency    string        `json:"frequency"`
 		ReturnKind   string        `json:"return_kind"`
@@ -336,6 +417,7 @@ func renderJSON(w io.Writer, r Report) error {
 		Stdev        []jsonFloat   `json:"stdev"`
 		AnnVol       []jsonFloat   `json:"annualised_volatility"`
 		Pairs        []jsonPair    `json:"pairs"`
+		Rolling      *jsonRolling  `json:"rolling,omitempty"`
 		Notes        []string      `json:"notes,omitempty"`
 	}
 
@@ -359,6 +441,17 @@ func renderJSON(w io.Writer, r Report) error {
 	}
 	for _, p := range r.Pairs {
 		jr.Pairs = append(jr.Pairs, jsonPair{A: p.A, B: p.B, R: jsonFloat(p.R), CI95Lo: jsonFloat(p.CI95Lo), CI95Hi: jsonFloat(p.CI95Hi)})
+	}
+
+	if r.Rolling.Window > 0 && len(r.Rolling.Dates) > 0 && len(r.Rolling.Pairs) > 0 {
+		roll := &jsonRolling{Window: r.Rolling.Window}
+		for _, d := range r.Rolling.Dates {
+			roll.Dates = append(roll.Dates, d.Format("2006-01-02"))
+		}
+		for _, rp := range r.Rolling.Pairs {
+			roll.Pairs = append(roll.Pairs, jsonRollingPair{A: rp.A, B: rp.B, Values: jfSlice(rp.Values)})
+		}
+		jr.Rolling = roll
 	}
 
 	enc := json.NewEncoder(w)

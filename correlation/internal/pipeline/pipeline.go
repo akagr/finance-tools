@@ -25,6 +25,7 @@ type Options struct {
 	FXPath          string // FX CSV; required when BaseCurrency needs conversions
 	Frequency       string // daily|weekly|monthly
 	ReturnKind      string // log|simple
+	RollingWindow   int    // >0 enables rolling correlation over this many return observations
 }
 
 // smallSample is the point below which correlations are flagged as noisy.
@@ -111,6 +112,35 @@ func BuildReport(opts Options) (report.Report, error) {
 		pairs[i] = report.Pair{A: p.A, B: p.B, R: p.R, CI95Lo: p.CI95Lo, CI95Hi: p.CI95Hi}
 	}
 
+	var rolling report.Rolling
+	if opts.RollingWindow > 0 {
+		if opts.RollingWindow < 2 {
+			return report.Report{}, fmt.Errorf("pipeline: rolling window must be >= 2, got %d", opts.RollingWindow)
+		}
+		if opts.RollingWindow > res.N {
+			return report.Report{}, fmt.Errorf("pipeline: rolling window %d exceeds %d %s return observations; shorten the window, lower the frequency, or widen the date range",
+				opts.RollingWindow, res.N, freq)
+		}
+		rollPairs, err := stats.Rolling(rets.Labels, rets.Series, opts.RollingWindow)
+		if err != nil {
+			return report.Report{}, err
+		}
+		rolling.Window = opts.RollingWindow
+		if len(rollPairs) > 0 {
+			for _, idx := range rollPairs[0].EndIdx {
+				rolling.Dates = append(rolling.Dates, rets.EndDates[idx])
+			}
+		}
+		for _, rp := range rollPairs {
+			rolling.Pairs = append(rolling.Pairs, report.RollingPair{A: rp.A, B: rp.B, Values: rp.Values})
+		}
+		if rolling.Window < smallSample {
+			notes = append(notes, fmt.Sprintf(
+				"Rolling window is only %d observations: each rolling r is noisy and its jitter can look like real regime change. Read the trend, not single points.",
+				rolling.Window))
+		}
+	}
+
 	return report.Report{
 		Meta: report.Meta{
 			Frequency:    string(freq),
@@ -128,6 +158,7 @@ func BuildReport(opts Options) (report.Report, error) {
 		Stdev:       res.Stdev,
 		AnnVol:      annVol,
 		Pairs:       pairs,
+		Rolling:     rolling,
 		N:           res.N,
 	}, nil
 }
