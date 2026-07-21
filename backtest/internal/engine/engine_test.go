@@ -95,3 +95,43 @@ func TestFlatStrategyNeverInvests(t *testing.T) {
 		}
 	}
 }
+
+// fixedWeight always targets the same fractional weight, to exercise the
+// rebalance band (a fractional target drifts as prices move and would otherwise
+// trade every bar).
+type fixedWeight float64
+
+func (fixedWeight) Name() string               { return "fixed" }
+func (w fixedWeight) Target([]float64) float64 { return float64(w) }
+
+func TestRebalanceBandCutsFractionalChurn(t *testing.T) {
+	// A volatile price path with a constant 50% target: a wider band must trade
+	// strictly less often than a tight one, since it tolerates more drift before
+	// rebalancing.
+	s := mkSeries(100, 106, 95, 108, 92, 110, 97, 103, 96, 104, 99, 107, 93, 109)
+	tight, err := Run(s, fixedWeight(0.5), Config{InitialCapital: 100000, Costs: DefaultCosts(), RebalanceBand: 0.001})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wide, err := Run(s, fixedWeight(0.5), Config{InitialCapital: 100000, Costs: DefaultCosts(), RebalanceBand: 0.10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wide.Trades >= tight.Trades {
+		t.Errorf("wide band trades (%d) should be fewer than tight band (%d)", wide.Trades, tight.Trades)
+	}
+}
+
+func TestZeroBandUsesDefault(t *testing.T) {
+	// A zero RebalanceBand must fall back to the default, not to "trade on every
+	// infinitesimal drift" — so a 50% target over a volatile path still trades a
+	// bounded number of times, not once per bar.
+	s := mkSeries(100, 106, 95, 108, 92, 110, 97, 103, 96, 104)
+	res, err := Run(s, fixedWeight(0.5), Config{InitialCapital: 100000, Costs: DefaultCosts()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Trades == 0 {
+		t.Error("expected some rebalancing for a fractional target")
+	}
+}

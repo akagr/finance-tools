@@ -51,7 +51,18 @@ func (c Costs) cost(notional float64) float64 {
 type Config struct {
 	InitialCapital float64
 	Costs          Costs
+	// RebalanceBand is the minimum gap between the target weight and the
+	// currently held weight (as a fraction of equity) before the engine trades.
+	// It models the reality that nobody rebalances a tiny drift, and stops a
+	// fractional-weight target (e.g. a volatility-scaled position) from churning
+	// every bar as prices move. Zero uses defaultRebalanceBand. A long/flat (0 or
+	// 1) strategy is unaffected: its target jumps by ~100%, dwarfing any band.
+	RebalanceBand float64
 }
+
+// defaultRebalanceBand is used when Config.RebalanceBand is zero: rebalance only
+// once the position has drifted 1% of equity from its target.
+const defaultRebalanceBand = 0.01
 
 // Result is the outcome of one strategy run.
 type Result struct {
@@ -89,11 +100,10 @@ func Run(s series.Series, strat strategy.Strategy, cfg Config) (Result, error) {
 
 	cash := cfg.InitialCapital
 	shares := 0.0
-	// No-trade band: rebalance only when the required trade exceeds this fraction
-	// of equity. Without it, cost drag nudges the target every bar and a constant
-	// -weight rule (e.g. buy-and-hold) churns spuriously; 1 bp also reflects that
-	// nobody rebalances a rounding error in real life.
-	const minTradeFraction = 1e-4
+	band := cfg.RebalanceBand
+	if band <= 0 {
+		band = defaultRebalanceBand
+	}
 
 	for i := 0; i < n; i++ {
 		price := closes[i]
@@ -108,7 +118,7 @@ func Run(s series.Series, strat strategy.Strategy, cfg Config) (Result, error) {
 
 		targetShares := target * equity / price
 		delta := targetShares - shares
-		if math.Abs(delta*price) > minTradeFraction*equity {
+		if math.Abs(delta*price) > band*equity {
 			// Cost-aware sizing: paying the fee shrinks equity, so re-solve the
 			// target against equity net of the (tiny) cost. This stops a constant
 			// -weight rule (e.g. buy-and-hold) from churning every bar to unwind

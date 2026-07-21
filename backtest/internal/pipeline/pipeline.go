@@ -29,7 +29,9 @@ type Options struct {
 	DonchianExit   int     // breakdown exit window (donchian)
 	InitialCapital float64 // starting cash; defaults to 100000 if <= 0
 	Costs          engine.Costs
-	SortBy         string // metric to rank the table by; "" = return (see sortKeys)
+	SortBy         string  // metric to rank the table by; "" = return (see sortKeys)
+	VolTarget      float64 // >0 enables volatility targeting at this annualised level (e.g. 0.10)
+	VolLookback    int     // trailing bars used to estimate realised vol (default 20)
 }
 
 // smallSample is the point below which results are flagged as unreliable.
@@ -219,13 +221,18 @@ func pick(all []series.Series, symbol string) (series.Series, error) {
 // including the buy-and-hold benchmark exactly once. For "all" it returns every
 // active strategy (built with the configured or default parameters) plus the
 // benchmark; otherwise the single chosen strategy plus the benchmark (or just
-// the benchmark if that is what was chosen).
+// the benchmark if that is what was chosen). Active strategies are wrapped with
+// a volatility-targeting overlay when Options.VolTarget > 0; the benchmark is
+// always left pure so the comparison stays honest.
 func strategiesFor(opts Options) ([]strategy.Strategy, error) {
 	if opts.Strategy == "all" {
 		out := make([]strategy.Strategy, 0, len(activeNames)+1)
 		for _, name := range activeNames {
 			st, err := buildStrategy(withStrategy(opts, name))
 			if err != nil {
+				return nil, err
+			}
+			if st, err = maybeVolTarget(st, opts); err != nil {
 				return nil, err
 			}
 			out = append(out, st)
@@ -240,7 +247,19 @@ func strategiesFor(opts Options) ([]strategy.Strategy, error) {
 	if st.Name() == benchmarkName {
 		return []strategy.Strategy{st}, nil
 	}
+	if st, err = maybeVolTarget(st, opts); err != nil {
+		return nil, err
+	}
 	return []strategy.Strategy{st, strategy.BuyHold{}}, nil
+}
+
+// maybeVolTarget wraps st with a volatility-targeting overlay when enabled,
+// otherwise returns st unchanged.
+func maybeVolTarget(st strategy.Strategy, opts Options) (strategy.Strategy, error) {
+	if opts.VolTarget <= 0 {
+		return st, nil
+	}
+	return strategy.NewVolTarget(st, opts.VolTarget, orDefaultInt(opts.VolLookback, 20))
 }
 
 // activeNames lists the non-benchmark strategies, in display order, that "all"

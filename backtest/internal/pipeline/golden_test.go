@@ -101,3 +101,19 @@ func TestGoldenAll(t *testing.T) {
 	checkGolden(t, "all.md", render(t, opts, "md"))
 	checkGolden(t, "all.json", render(t, opts, "json"))
 }
+
+// Locks the volatility-targeting overlay path: the active strategy is wrapped
+// and sized, while the benchmark stays pure.
+func TestGoldenVolTarget(t *testing.T) {
+	opts := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		Strategy:       "sma-cross",
+		Fast:           5,
+		Slow:           20,
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+		VolTarget:      0.10,
+		VolLookback:    20,
+	}
+	checkGolden(t, "voltarget.md", render(t, opts, "md"))
+}

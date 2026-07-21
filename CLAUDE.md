@@ -15,8 +15,10 @@ in one `go.work` workspace:
 - **`backtest/`** — an offline **backtester** for rule-based strategies on NSE daily data
   (trend, momentum, mean-reversion and breakout rules vs a buy-and-hold benchmark, realistic
   costs). Each strategy lives in its own file under `internal/strategy/` and is registered in
-  `pipeline.buildStrategy`. A research tool: output is not advice, and a backtest is a
-  hypothesis fit to the past, not a forecast. See `backtest/README.md`.
+  `pipeline.buildStrategy`; `--strategy all` compares them in one table, `--sort` ranks it, and
+  `--vol-target` adds a volatility-targeting position-sizing overlay (the benchmark stays
+  unscaled). A research tool: output is not advice, and a backtest is a hypothesis fit to the
+  past, not a forecast. See `backtest/README.md`.
 
 ## Commands
 

@@ -57,6 +57,24 @@ once per bar in order; most rules are pure functions of the history passed, but 
 carry state across calls for entry/exit hysteresis (see `donchian.go`). It must never read past
 the slice it is given (no lookahead).
 
+## Position sizing (volatility targeting)
+
+By default a strategy is all-in or all-out (weight 0 or 1). Pass `--vol-target` to scale the
+active strategies' positions so their trailing realised volatility approaches a target — e.g.
+`--vol-target 10` aims for 10% annualised vol, trimming exposure when the asset is turbulent:
+
+```sh
+go run ./cmd/backtest run --prices data/nifty.csv --symbol NIFTY50 --strategy all --vol-target 10
+```
+
+It is an **overlay, not a signal**: the strategy still decides *whether* to be in the market;
+sizing decides *how much*. It is **long-only and never levers up** (a retail cash account has no
+margin), so it can only reduce exposure — smoothing the ride and cutting drawdowns, usually at
+the cost of total return. The buy-and-hold benchmark is deliberately left **unscaled**, so the
+comparison stays honest. Holding a fractional weight rebalances as prices drift; the engine's
+rebalance band (1% of equity by default) keeps that churn to periodic, low-cost trades rather
+than a trade every bar.
+
 ## Usage
 
 ```
@@ -72,6 +90,8 @@ backtest run --prices <csv> [flags]
   --rsi-threshold  buy when RSI is below this, rsi (default 30)
   --entry          breakout entry window in bars, donchian (default 20)
   --exit           breakdown exit window in bars, donchian (default 10)
+  --vol-target     annualised volatility target in %, e.g. 10; 0 disables sizing (default 0)
+  --vol-lookback   trailing bars used to estimate realised volatility (default 20)
   --capital        initial capital in INR (default 100000)
   --brokerage-bps  brokerage per trade, basis points (default 0)
   --stt-bps        securities transaction tax per trade, basis points (default 10)
@@ -103,8 +123,11 @@ NSE cash symbols use a `.NS` Yahoo suffix (e.g. `NIFTYBEES.NS`); indices are pre
   (no lookahead).
 - **Costs are charged on every trade's notional**: brokerage + STT + slippage, each in basis
   points. Defaults approximate NSE cash-delivery friction and are deliberately conservative —
-  underestimating costs is how backtests lie. A no-trade band (1 bp of equity) stops a
-  constant-weight rule from churning to unwind its own fee drag.
+  underestimating costs is how backtests lie. A rebalance band (1% of equity by default) stops a
+  constant- or fractional-weight target from churning every bar to unwind price drift or its own
+  fee drag.
+- **Long/flat or fractional, long-only, no leverage.** Base strategies are all-in/all-out;
+  `--vol-target` scales the position but never above 100%. No shorting, margin or intraday bars.
 - **Metrics**: total return, CAGR (over the actual calendar span), annualised volatility,
   Sharpe and **Sortino** (252 trading days, zero risk-free rate; Sortino penalises only downside
   deviation), max drawdown and **Calmar** (CAGR ÷ max drawdown), plus trades, turnover and
@@ -112,8 +135,8 @@ NSE cash symbols use a `.NS` Yahoo suffix (e.g. `NIFTYBEES.NS`); indices are pre
   promotes a lower-return but smoother strategy above buy-and-hold.
 - **Money is `float64`**, not `math/big.Rat` — like the sibling `correlation` module, this is
   statistics rather than tax accounting, where a paisa of rounding is immaterial.
-- **One asset, one series at a time.** No portfolios, shorting, leverage, intraday bars, or
-  corporate-action adjustment yet. Use adjusted-close symbols where possible.
+- **One asset, one series at a time.** No multi-asset portfolios or corporate-action adjustment
+  yet — use adjusted-close symbols where possible.
 
 ## Roadmap
 
@@ -123,9 +146,10 @@ ideas should die in Phase 1 or 2 — cheaply, on a laptop, instead of expensivel
 
 **Phase 1 — Backtesting (here now).** Measure a rule's edge on history against a benchmark.
 Delivered so far: multiple strategies with a one-shot `--strategy all` comparison, risk-adjusted
-metrics (Sharpe, Sortino, Calmar) and a `--sort` to rank the table by any of them. Next:
+metrics (Sharpe, Sortino, Calmar), a `--sort` to rank the table by any of them, and
+volatility-targeted **position sizing** (`--vol-target`) with a configurable engine rebalance
+band. Next:
 
-- Risk-based **position sizing** (volatility targeting) instead of all-in/all-out weights.
 - Further metrics: win rate, average holding period, rolling returns.
 - **Corporate-action-adjusted** closes and a `--benchmark` other than buy-and-hold.
 - Multi-asset **portfolios** (cross-sectional momentum, equal-risk weighting) and long/short.

@@ -93,6 +93,8 @@ func cmdRun(args []string) int {
 		slipBps   = fs.Float64("slippage-bps", 5, "assumed slippage per trade, basis points")
 		format    = fs.String("format", "md", "comma-separated output formats: md,csv,json")
 		sortBy    = fs.String("sort", "return", "rank the table by: return|cagr|sharpe|sortino|calmar|drawdown")
+		volTarget = fs.Float64("vol-target", 0, "annualised volatility target in percent (e.g. 10); 0 disables position sizing")
+		volLook   = fs.Int("vol-lookback", 20, "trailing bars used to estimate realised volatility (--vol-target)")
 		out       = fs.String("out", "", "output directory (default: print to stdout)")
 	)
 	if err := fs.Parse(args); err != nil {
@@ -117,6 +119,8 @@ func cmdRun(args []string) int {
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		SortBy:         *sortBy,
+		VolTarget:      *volTarget / 100, // flag is a percent; pipeline wants a fraction
+		VolLookback:    *volLook,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

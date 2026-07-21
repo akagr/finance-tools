@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -132,5 +133,49 @@ func TestUnknownSortKeyErrors(t *testing.T) {
 	opts.SortBy = "bogus"
 	if _, err := BuildReport(opts); err == nil {
 		t.Fatal("expected error for unknown --sort key")
+	}
+}
+
+func TestVolTargetWrapsActiveButNotBenchmark(t *testing.T) {
+	opts := baseOpts()
+	opts.Strategy = "sma-cross"
+	opts.VolTarget = 0.10
+	opts.VolLookback = 20
+	rep, err := BuildReport(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawWrapped, sawPureBench bool
+	for _, l := range rep.Lines {
+		if l.Strategy == benchmarkName {
+			sawPureBench = true // benchmark name is untouched
+		}
+		if strings.Contains(l.Strategy, "voltgt(") {
+			sawWrapped = true
+		}
+	}
+	if !sawWrapped {
+		t.Error("expected the active strategy to be wrapped with a voltgt overlay")
+	}
+	if !sawPureBench {
+		t.Error("expected the buy-hold benchmark to remain pure (unwrapped)")
+	}
+}
+
+func TestVolTargetAppliesToAllActiveStrategies(t *testing.T) {
+	opts := baseOpts()
+	opts.Strategy = "all"
+	opts.VolTarget = 0.10
+	rep, err := BuildReport(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range rep.Lines {
+		if l.Strategy == benchmarkName {
+			continue
+		}
+		if !strings.Contains(l.Strategy, "voltgt(") {
+			t.Errorf("active strategy %q not wrapped with voltgt overlay", l.Strategy)
+		}
 	}
 }
