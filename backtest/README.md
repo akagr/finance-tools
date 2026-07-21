@@ -250,11 +250,58 @@ How to read it:
   up); the folds only slice up the resulting equity curve for measurement.
 
 This does **not** re-tune parameters per fold yet (that is a later step) — it checks whether a
-*fixed* rule is consistent across time. Walk-forward with per-fold re-optimisation, parameter
-sweeps and regime analysis are the rest of Phase 2 on the roadmap.
+*fixed* rule is consistent across time. Walk-forward with per-fold re-optimisation and regime
+analysis are the rest of Phase 2 on the roadmap.
 
 `walkforward` takes the same strategy and cost flags as `run`, plus `--folds N` (default 4). It
 needs a single non-benchmark strategy (not `all`).
+
+## Parameter sweeps: robust plateau, or overfit spike?
+
+Every strategy has knobs (`--fast`, `--slow`, `--lookback`, …). It is dangerously easy to try
+values until one sparkles — but that number is fitted to *this* history's noise and won't repeat.
+A **sweep** runs the strategy across a whole grid of values and shows the *shape* of the result:
+
+- A **broad plateau** of good values → the edge is robust; it doesn't depend on picking the exact
+  magic number, which is what you want.
+- A **lone spike** surrounded by poor values → almost certainly overfit; that one setting got
+  lucky on this sample and will disappoint live.
+
+```sh
+# Sweep sma-cross's two windows and colour the grid by Sharpe.
+go run ./cmd/backtest sweep --prices data/nifty.csv --symbol NIFTY50 \
+  --strategy sma-cross --metric sharpe
+```
+
+A real 2-D grid (rows = `fast`, columns = `slow`, each cell is the Sharpe ratio):
+
+```
+| fast\slow |   60 |    80 |  100 |  120 |  140 |  160 |  180 |  200 |
+| 10        | 0.91 | 1.08◄ | 0.93 | 0.77 | 0.79 | 0.71 | 0.68 | 0.63 |
+| 20        | 0.99 |  0.92 | 0.73 | 0.67 | 0.66 | 0.60 | 0.63 | 0.55 |
+| 30        | 0.70 |  0.67 | 0.67 | 0.59 | 0.46 | 0.53 | 0.54 | 0.50 |
+| 40        | 0.64 |  0.50 | 0.58 | 0.53 | 0.48 | 0.50 | 0.45 | 0.47 |
+| 50        | 0.63 |  0.75 | 0.72 | 0.59 | 0.48 | 0.42 | 0.41 | 0.42 |
+```
+
+The `◄` marks the best cell (fast=10/slow=80, Sharpe 1.08). More importantly, the good values form
+a **connected region** in the short-fast corner that fades smoothly — a fairly robust surface, not
+an isolated fluke. If the best cell had been `2.0` with `0.3` all around it, you'd distrust it.
+
+**How to use it:**
+
+- **One parameter** → a table, one row per value, with all metrics and the best row marked. Great
+  for `momentum --lookback` or exploring a single knob.
+- **Two parameters** → the heatmap grid above, cells coloured by `--metric`
+  (`return|cagr|sharpe|sortino|calmar|drawdown`, default `sharpe`). Invalid combinations (e.g. a
+  crossover with `fast ≥ slow`) show as `—`.
+- Specify the grid with `--param name:min:max:step`, up to twice. With no `--param`, a sensible
+  default grid is chosen for the strategy. Example:
+  `sweep --strategy rsi --param rsi-period:5:25:5 --param rsi-threshold:20:40:5 --metric calmar`.
+
+Reach for a **narrow, isolated** best cell as a warning, not a discovery. Prefer a strategy whose
+good region is wide — you'll be picking parameters blind on future data, so you want to land
+*somewhere* in the good zone, not on a knife-edge.
 
 ## Usage
 
@@ -283,6 +330,10 @@ backtest run --prices <csv> [flags]
 
 backtest walkforward --prices <csv> --strategy <name> [--folds N] [same strategy/cost flags as run]
   --folds          number of consecutive out-of-sample folds (default 4)
+
+backtest sweep --prices <csv> --strategy <name> [--param name:min:max:step ...] [same cost flags]
+  --param          parameter to sweep as name:min:max:step (repeatable, up to 2; default per strategy)
+  --metric         grid metric: return | cagr | sharpe | sortino | calmar | drawdown (default sharpe)
 
 backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
 ```
@@ -341,11 +392,11 @@ band. Next:
 
 **Phase 2 — Robustness & validation.** Stop fooling yourself. A single backtest is the *most*
 flattering number a strategy will ever show. Delivered so far: **walk-forward** analysis
-(`walkforward` command) that tests a fixed rule across consecutive out-of-sample folds. Next:
+(`walkforward`) that tests a fixed rule across consecutive out-of-sample folds, and **parameter
+sweeps** (`sweep`) that map the performance surface to tell a robust plateau from an overfit
+spike. Next:
 
 - Walk-forward with per-fold **parameter re-optimisation** (fit on one window, test on the next).
-- **Parameter sweeps** with heatmaps to see whether an edge is a plateau (robust) or a spike
-  (overfit), plus a note on multiple-testing / data-mining bias.
 - Monte-Carlo trade reshuffling and regime analysis (bull/bear/sideways, high/low vol).
 - Sensitivity to costs and slippage — the edge must survive pessimistic assumptions.
 

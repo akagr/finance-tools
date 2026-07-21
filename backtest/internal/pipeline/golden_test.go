@@ -143,3 +143,41 @@ func TestGoldenWalkForward(t *testing.T) {
 	checkGolden(t, "walkforward.csv", renderWF("csv"))
 	checkGolden(t, "walkforward.json", renderWF("json"))
 }
+
+// Locks the parameter-sweep render path: a 2-D crossover grid (with invalid
+// cells) and a 1-D momentum sweep.
+func TestGoldenSweep(t *testing.T) {
+	base := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+	}
+	renderSw := func(sw report.Sweep, format string) []byte {
+		var buf bytes.Buffer
+		if err := report.RenderSweep(&buf, sw, format); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+
+	grid := base
+	grid.Strategy = "sma-cross"
+	sw2d, err := BuildSweep(grid, []SweepAxis{
+		{Name: "fast", Min: 5, Max: 15, Step: 5},
+		{Name: "slow", Min: 10, Max: 30, Step: 10},
+	}, "sharpe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkGolden(t, "sweep_2d.md", renderSw(sw2d, "md"))
+	checkGolden(t, "sweep_2d.json", renderSw(sw2d, "json"))
+
+	mom := base
+	mom.Strategy = "momentum"
+	sw1d, err := BuildSweep(mom, []SweepAxis{{Name: "lookback", Min: 10, Max: 40, Step: 10}}, "cagr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkGolden(t, "sweep_1d.md", renderSw(sw1d, "md"))
+	checkGolden(t, "sweep_1d.csv", renderSw(sw1d, "csv"))
+}

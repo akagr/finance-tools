@@ -33,8 +33,9 @@ capital — money is the last step, not the first:
 
 1. **Backtesting** *(done)* — measure a rule's edge on history vs a benchmark; compare strategies,
    rank by risk-adjusted metrics, and size positions by volatility.
-2. **Robustness & validation** *(in progress)* — walk-forward / out-of-sample folds already check
-   an edge is consistent, not a lucky stretch; parameter sweeps, regime and cost sensitivity next.
+2. **Robustness & validation** *(in progress)* — walk-forward / out-of-sample folds and parameter
+   sweeps already check an edge is consistent and not a lucky point; per-fold re-optimisation,
+   regime and cost sensitivity next.
 3. **Paper trading** *(zero capital)* — a live data feed with simulated orders for weeks;
    likely a new `papertrade/` module.
 4. **Live, bounded, tiny** — only if an edge survives, as an approved rule-based bot with hard

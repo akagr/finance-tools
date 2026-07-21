@@ -40,6 +40,8 @@ func main() {
 		os.Exit(cmdRun(os.Args[2:]))
 	case "walkforward", "wf":
 		os.Exit(cmdWalkForward(os.Args[2:]))
+	case "sweep":
+		os.Exit(cmdSweep(os.Args[2:]))
 	case "fetch":
 		os.Exit(cmdFetch(os.Args[2:]))
 	case "version":
@@ -60,6 +62,7 @@ Usage:
   backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
   backtest run --prices <csv> [--symbol <s>] [--strategy <name>] [strategy flags]
   backtest walkforward --prices <csv> --strategy <name> [--folds N] [strategy flags]
+  backtest sweep --prices <csv> --strategy <name> --param name:min:max:step [--param ...] [--metric M]
   backtest version
 
 Strategies (each is run against a buy-and-hold benchmark):
@@ -73,8 +76,10 @@ Strategies (each is run against a buy-and-hold benchmark):
 
 "run" backtests once over the whole history; "walkforward" splits the history into
 consecutive out-of-sample folds to check the edge is consistent, not a lucky stretch.
+"sweep" varies one or two parameters over a grid to see if a good result is a robust
+plateau or an overfit spike.
 
-Run "backtest run -h" or "backtest walkforward -h" for all flags.
+Run "backtest run -h", "backtest walkforward -h" or "backtest sweep -h" for all flags.
 
 %s
 `, disclaimer)
@@ -280,6 +285,142 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// multiFlag collects a repeatable string flag (e.g. --param used twice).
+type multiFlag []string
+
+func (m *multiFlag) String() string { return strings.Join(*m, ",") }
+func (m *multiFlag) Set(s string) error {
+	*m = append(*m, s)
+	return nil
+}
+
+// parseParamSpec parses "name:min:max:step" into a sweep axis.
+func parseParamSpec(spec string) (pipeline.SweepAxis, error) {
+	parts := strings.Split(spec, ":")
+	if len(parts) != 4 {
+		return pipeline.SweepAxis{}, fmt.Errorf("bad --param %q; want name:min:max:step (e.g. fast:10:50:10)", spec)
+	}
+	min, err1 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+	max, err2 := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+	step, err3 := strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return pipeline.SweepAxis{}, fmt.Errorf("bad numbers in --param %q; want name:min:max:step", spec)
+	}
+	return pipeline.SweepAxis{Name: strings.TrimSpace(parts[0]), Min: min, Max: max, Step: step}, nil
+}
+
+// defaultSweepAxes supplies a sensible parameter grid per strategy, so `sweep
+// --strategy X` works with no --param flags.
+func defaultSweepAxes(strategy string) []pipeline.SweepAxis {
+	switch strategy {
+	case "sma-cross", "ema-cross":
+		return []pipeline.SweepAxis{{Name: "fast", Min: 10, Max: 50, Step: 10}, {Name: "slow", Min: 60, Max: 200, Step: 20}}
+	case "momentum":
+		return []pipeline.SweepAxis{{Name: "lookback", Min: 20, Max: 200, Step: 20}}
+	case "rsi":
+		return []pipeline.SweepAxis{{Name: "rsi-period", Min: 5, Max: 25, Step: 5}, {Name: "rsi-threshold", Min: 20, Max: 40, Step: 5}}
+	case "donchian":
+		return []pipeline.SweepAxis{{Name: "entry", Min: 10, Max: 60, Step: 10}, {Name: "exit", Min: 5, Max: 30, Step: 5}}
+	default:
+		return nil
+	}
+}
+
+func cmdSweep(args []string) int {
+	fs := flag.NewFlagSet("sweep", flag.ExitOnError)
+	var params multiFlag
+	fs.Var(&params, "param", "parameter to sweep as name:min:max:step (repeatable, up to 2)")
+	var (
+		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
+		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian")
+		metric    = fs.String("metric", "sharpe", "grid metric: return|cagr|sharpe|sortino|calmar|drawdown")
+		capital   = fs.Float64("capital", 100000, "initial capital in INR")
+		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
+		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
+		slipBps   = fs.Float64("slippage-bps", 5, "assumed slippage per trade, basis points")
+		volTarget = fs.Float64("vol-target", 0, "annualised volatility target in percent (e.g. 10); 0 disables position sizing")
+		volLook   = fs.Int("vol-lookback", 20, "trailing bars used to estimate realised volatility (--vol-target)")
+		format    = fs.String("format", "md", "comma-separated output formats: md,csv,json")
+		out       = fs.String("out", "", "output directory (default: print to stdout)")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *pricesP == "" {
+		fmt.Fprintln(os.Stderr, "error: --prices is required")
+		return 2
+	}
+
+	var axes []pipeline.SweepAxis
+	if len(params) == 0 {
+		axes = defaultSweepAxes(*strat)
+		if axes == nil {
+			fmt.Fprintf(os.Stderr, "error: no default sweep for strategy %q; pass --param name:min:max:step\n", *strat)
+			return 2
+		}
+	} else {
+		for _, spec := range params {
+			ax, err := parseParamSpec(spec)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error:", err)
+				return 2
+			}
+			axes = append(axes, ax)
+		}
+	}
+
+	opts := pipeline.Options{
+		PricesPath:     *pricesP,
+		Symbol:         *symbol,
+		Strategy:       *strat,
+		InitialCapital: *capital,
+		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
+		VolTarget:      *volTarget / 100,
+		VolLookback:    *volLook,
+	}
+	sw, err := pipeline.BuildSweep(opts, axes, *metric)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+
+	formats := splitCSV(*format)
+	if *out == "" {
+		for i, fmtName := range formats {
+			if i > 0 {
+				fmt.Println()
+			}
+			if err := report.RenderSweep(os.Stdout, sw, fmtName); err != nil {
+				fmt.Fprintln(os.Stderr, "error:", err)
+				return 1
+			}
+		}
+		return 0
+	}
+
+	if err := os.MkdirAll(*out, 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	for _, fmtName := range formats {
+		path := filepath.Join(*out, "sweep."+extFor(fmtName))
+		file, err := os.Create(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		if err := report.RenderSweep(file, sw, fmtName); err != nil {
+			file.Close()
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		file.Close()
+		fmt.Fprintln(os.Stderr, "wrote", path)
+	}
+	return 0
 }
 
 const dateLayout = "2006-01-02"

@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "symbol": "SYNTH",
+    "strategy": "sma-cross",
+    "start": "2023-01-02",
+    "end": "2023-06-16",
+    "bars": 120,
+    "metric": "sharpe",
+    "notes": [
+      "Look at the shape, not the single best cell. A broad region of good values means the edge is robust to the exact parameters; a lone peak surrounded by poor values is almost certainly overfit to this history and will not repeat."
+    ]
+  },
+  "axis_names": [
+    "fast",
+    "slow"
+  ],
+  "axis_values": [
+    [
+      5,
+      10,
+      15
+    ],
+    [
+      10,
+      20,
+      30
+    ]
+  ],
+  "points": [
+    {
+      "coords": [
+        5,
+        10
+      ],
+      "valid": true,
+      "return": 0.23791010584439132,
+      "cagr": 0.6039099471406086,
+      "sharpe": 7.55063983905668,
+      "sortino": 25.361315324024417,
+      "max_drawdown": 0.014688761002272661,
+      "calmar": 41.11374315690554,
+      "trades": 6,
+      "metric_value": 7.55063983905668
+    },
+    {
+      "coords": [
+        5,
+        20
+      ],
+      "valid": true,
+      "return": 0.12777381785568687,
+      "cagr": 0.3049700236181623,
+      "sharpe": 4.00515016668341,
+      "sortino": 8.332186375038237,
+      "max_drawdown": 0.035733595315918215,
+      "calmar": 8.534546298012938,
+      "trades": 6,
+      "metric_value": 4.00515016668341
+    },
+    {
+      "coords": [
+        5,
+        30
+      ],
+      "valid": true,
+      "return": 0.06625575587580701,
+      "cagr": 0.15259036004260773,
+      "sharpe": 2.203344860924625,
+      "sortino": 3.9582878502739174,
+      "max_drawdown": 0.053998353073395344,
+      "calmar": 2.8258335922802074,
+      "trades": 4,
+      "metric_value": 2.203344860924625
+    },
+    {
+      "coords": [
+        10,
+        10
+      ],
+      "valid": false
+    },
+    {
+      "coords": [
+        10,
+        20
+      ],
+      "valid": true,
+      "return": 0.06853846962519161,
+      "cagr": 0.1580597041603562,
+      "sharpe": 2.2770107043546655,
+      "sortino": 4.08711136412855,
+      "max_drawdown": 0.041876782606855886,
+      "calmar": 3.7743994242403747,
+      "trades": 6,
+      "metric_value": 2.2770107043546655
+    },
+    {
+      "coords": [
+        10,
+        30
+      ],
+      "valid": true,
+      "return": 0.0050402030049039315,
+      "cagr": 0.0111913129653618,
+      "sharpe": 0.20869230502934247,
+      "sortino": 0.3231094539712133,
+      "max_drawdown": 0.06490872319616783,
+      "calmar": 0.17241616248619301,
+      "trades": 4,
+      "metric_value": 0.20869230502934247
+    },
+    {
+      "coords": [
+        15,
+        10
+      ],
+      "valid": false
+    },
+    {
+      "coords": [
+        15,
+        20
+      ],
+      "valid": true,
+      "return": 0.00981744073270252,
+      "cagr": 0.0218618018458403,
+      "sharpe": 0.3531561246385226,
+      "sortino": 0.5472691950757345,
+      "max_drawdown": 0.05399835205183601,
+      "calmar": 0.4048605376855565,
+      "trades": 6,
+      "metric_value": 0.3531561246385226
+    },
+    {
+      "coords": [
+        15,
+        30
+      ],
+      "valid": true,
+      "return": -0.04764189725266721,
+      "cagr": -0.10242338023266462,
+      "sharpe": -1.8773960509227214,
+      "sortino": -2.5271638160677665,
+      "max_drawdown": 0.09401683590916701,
+      "calmar": -1.0894153078244355,
+      "trades": 4,
+      "metric_value": -1.8773960509227214
+    }
+  ],
+  "best": 7.55063983905668,
+  "worst": -1.8773960509227214,
+  "lower_is_better": false
+}
