@@ -335,6 +335,22 @@ Reach for a **narrow, isolated** best cell as a warning, not a discovery. Prefer
 good region is wide — you'll be picking parameters blind on future data, so you want to land
 *somewhere* in the good zone, not on a knife-edge.
 
+### Cost sensitivity
+
+You can sweep the **trading-cost** knobs too — `slippage-bps`, `brokerage-bps`, `stt-bps` — to see
+how fast an edge decays as costs rise. Set the strategy's own parameters as fixed flags and sweep
+the cost:
+
+```sh
+# How does ema-cross(20/50)'s return hold up as slippage goes from 0 to 30 bps?
+go run ./cmd/backtest sweep --prices data/nifty.csv --symbol NIFTY50 \
+  --strategy ema-cross --fast 20 --slow 50 --param slippage-bps:0:30:5 --metric return
+```
+
+A strategy whose advantage survives only at unrealistically low costs has no real edge — and live
+costs are always worse than a backtest's. A gentle, linear decay (rather than a cliff) is the
+reassuring shape.
+
 ## Usage
 
 ```
@@ -367,6 +383,7 @@ backtest walkforward --prices <csv> --strategy <name> [--folds N] [--optimize] [
 
 backtest sweep --prices <csv> --strategy <name> [--param name:min:max:step ...] [same cost flags]
   --param          parameter to sweep as name:min:max:step (repeatable, up to 2; default per strategy)
+                   names: fast|slow|lookback|rsi-period|rsi-threshold|entry|exit|slippage-bps|brokerage-bps|stt-bps|vol-target
   --metric         grid metric: return | cagr | sharpe | sortino | calmar | drawdown (default sharpe)
 
 backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
@@ -426,12 +443,12 @@ band. Next:
 
 **Phase 2 — Robustness & validation.** Stop fooling yourself. A single backtest is the *most*
 flattering number a strategy will ever show. Delivered so far: **walk-forward** analysis
-(`walkforward`), **parameter sweeps** (`sweep`) that map the performance surface, and
-**walk-forward optimisation** (`walkforward --optimize`) that re-fits parameters on each training
-window and tests them out-of-sample — the most honest estimate here of live performance. Next:
+(`walkforward`), **parameter sweeps** (`sweep`) that map the performance surface (including
+**cost-sensitivity** sweeps over slippage/brokerage/STT), and **walk-forward optimisation**
+(`walkforward --optimize`) that re-fits parameters on each training window and tests them
+out-of-sample — the most honest estimate here of live performance. Next:
 
 - Monte-Carlo trade reshuffling and regime analysis (bull/bear/sideways, high/low vol).
-- Sensitivity to costs and slippage — the edge must survive pessimistic assumptions.
 - Rolling (non-anchored) training windows as an option alongside the current anchored one.
 
 **Phase 3 — Paper trading (zero capital).** Wire the surviving strategy to a **live data feed**

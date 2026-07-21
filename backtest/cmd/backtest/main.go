@@ -365,6 +365,13 @@ func cmdSweep(args []string) int {
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
 		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian")
 		metric    = fs.String("metric", "sharpe", "grid metric: return|cagr|sharpe|sortino|calmar|drawdown")
+		fast      = fs.Int("fast", 20, "fixed fast MA window when not swept (sma-cross, ema-cross)")
+		slow      = fs.Int("slow", 50, "fixed slow MA window when not swept (sma-cross, ema-cross)")
+		lookback  = fs.Int("lookback", 120, "fixed lookback when not swept (momentum)")
+		rsiPeriod = fs.Int("rsi-period", 14, "fixed RSI period when not swept (rsi)")
+		rsiThresh = fs.Float64("rsi-threshold", 30, "fixed RSI threshold when not swept (rsi)")
+		entry     = fs.Int("entry", 20, "fixed breakout entry window when not swept (donchian)")
+		exit      = fs.Int("exit", 10, "fixed breakdown exit window when not swept (donchian)")
 		capital   = fs.Float64("capital", 100000, "initial capital in INR")
 		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
@@ -404,6 +411,13 @@ func cmdSweep(args []string) int {
 		PricesPath:     *pricesP,
 		Symbol:         *symbol,
 		Strategy:       *strat,
+		Fast:           *fast,
+		Slow:           *slow,
+		Lookback:       *lookback,
+		RSIPeriod:      *rsiPeriod,
+		RSIThreshold:   *rsiThresh,
+		DonchianEntry:  *entry,
+		DonchianExit:   *exit,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		VolTarget:      *volTarget / 100,

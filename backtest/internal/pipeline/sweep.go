@@ -133,6 +133,9 @@ func BuildSweep(opts Options, axes []SweepAxis, metric string) (report.Sweep, er
 	notes := []string{
 		"Look at the shape, not the single best cell. A broad region of good values means the edge is robust to the exact parameters; a lone peak surrounded by poor values is almost certainly overfit to this history and will not repeat.",
 	}
+	if anyCostAxis(names) {
+		notes = append(notes, "This grid varies trading costs: watch how fast the edge decays as costs rise. A strategy whose advantage evaporates under realistic (or pessimistic) costs has no real edge — live costs are always worse than a backtest's.")
+	}
 
 	return report.Sweep{
 		Meta: report.SweepMeta{
@@ -205,11 +208,28 @@ func runCombo(s series.Series, opts Options, axes []SweepAxis, coords []float64,
 	if strat, err = maybeVolTarget(strat, runOpts); err != nil {
 		return metrics.Stats{}, false, err
 	}
-	res, err := engine.Run(s, strat, cfg)
+	// A swept cost parameter (slippage-bps, etc.) changes runOpts.Costs; honour
+	// it. Otherwise keep the resolved base costs from cfg.
+	runCfg := cfg
+	if runOpts.Costs != (engine.Costs{}) {
+		runCfg.Costs = runOpts.Costs
+	}
+	res, err := engine.Run(s, strat, runCfg)
 	if err != nil {
 		return metrics.Stats{}, false, err
 	}
 	return metrics.Compute(res.Dates, res.Equity, res.Weights, res.Trades, res.Turnover, res.TotalCost), true, nil
+}
+
+// anyCostAxis reports whether any swept axis is a trading-cost parameter.
+func anyCostAxis(names []string) bool {
+	for _, n := range names {
+		switch n {
+		case "slippage-bps", "brokerage-bps", "stt-bps":
+			return true
+		}
+	}
+	return false
 }
 
 // applyParam sets the named parameter on a copy of opts.
@@ -229,8 +249,16 @@ func applyParam(opts Options, name string, v float64) (Options, error) {
 		opts.DonchianEntry = int(math.Round(v))
 	case "exit":
 		opts.DonchianExit = int(math.Round(v))
+	case "slippage-bps":
+		opts.Costs.SlippageBps = v
+	case "brokerage-bps":
+		opts.Costs.BrokerageBps = v
+	case "stt-bps":
+		opts.Costs.STTBps = v
+	case "vol-target":
+		opts.VolTarget = v / 100 // percent to fraction, matching the CLI flag
 	default:
-		return opts, fmt.Errorf("pipeline: unknown sweep parameter %q (want fast|slow|lookback|rsi-period|rsi-threshold|entry|exit)", name)
+		return opts, fmt.Errorf("pipeline: unknown sweep parameter %q (want fast|slow|lookback|rsi-period|rsi-threshold|entry|exit|slippage-bps|brokerage-bps|stt-bps|vol-target)", name)
 	}
 	return opts, nil
 }

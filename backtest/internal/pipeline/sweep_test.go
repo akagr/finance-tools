@@ -124,3 +124,27 @@ func TestBuildSweepBestIsExtreme(t *testing.T) {
 		}
 	}
 }
+
+func TestSweepCostParameterAffectsResult(t *testing.T) {
+	// Sweeping slippage must actually change the outcome: higher slippage should
+	// not improve total return (it can only cost money), and it must move.
+	opts := sweepOpts("sma-cross")
+	opts.Fast = 3
+	opts.Slow = 8
+	sw, err := BuildSweep(opts, []SweepAxis{{Name: "slippage-bps", Min: 0, Max: 40, Step: 20}}, "return")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sw.Points) != 3 {
+		t.Fatalf("points = %d, want 3", len(sw.Points))
+	}
+	// Points are in ascending slippage order; return must be non-increasing.
+	for i := 1; i < len(sw.Points); i++ {
+		if sw.Points[i].Return > sw.Points[i-1].Return+1e-9 {
+			t.Errorf("return rose with higher slippage: %v then %v", sw.Points[i-1].Return, sw.Points[i].Return)
+		}
+	}
+	if sw.Points[0].Return == sw.Points[2].Return {
+		t.Error("slippage sweep had no effect on return")
+	}
+}
