@@ -31,6 +31,48 @@ go run ./cmd/backtest run --prices data/nifty.csv --symbol NIFTY50 --strategy al
 Expect most simple rules to **lose to buy-and-hold after costs** — discovering that cheaply is
 the entire point.
 
+## New here? The core ideas in plain English
+
+If you've never done this before, read this once and the rest will make sense.
+
+- **Backtest** — a simulation. You take a *rule* for buying and selling ("hold the index when
+  it's trending up, sit in cash otherwise"), replay it over real historical prices, and see what
+  your money would have done. It answers "would this rule have worked?" — nothing more.
+- **Strategy (or rule)** — the logic that decides, on each day, how much of your money should be
+  in the asset. Here every strategy outputs a **weight** between 0 and 1: `0` = fully in cash,
+  `1` = fully invested, `0.5` = half in, half cash.
+- **Benchmark** — the thing you must beat to justify any effort. Ours is **buy-and-hold**: buy on
+  day one, never trade, just sit. If a clever rule can't beat "do nothing," the rule is worthless.
+  Every run shows your strategy *and* buy-and-hold side by side.
+- **Bar** — one row of price data. Here, one trading **day** (the day's closing price).
+- **Position / exposure** — how invested you are right now. "Flat" means 0% (all cash).
+- **Costs** — trading isn't free. Every buy/sell pays brokerage, tax (STT) and **slippage** (the
+  price moving against you between deciding and filling). Costs quietly kill most strategies, so
+  we always subtract them.
+- **Drawdown** — how far you fell from a previous peak. A 38% max drawdown means that at the
+  worst moment you were down 38% from your high — the gut-check for "could I actually stomach
+  holding this?"
+
+The golden rule: **a good backtest is a reason to investigate further, never a reason to trade.**
+It is the most flattering number a strategy will ever show, because it is fitted to the one past
+that already happened.
+
+## How a single run works
+
+Each `run` walks day by day through the price history and does four things:
+
+1. **Ask the strategy** for a target weight (0–1) using only the prices *up to and including
+   today* — never the future (that would be cheating, called "lookahead").
+2. **Rebalance** the portfolio toward that weight, **paying costs** on whatever it trades. To
+   avoid pointless churn it only trades when the position has drifted more than ~1% from target.
+3. **Mark to market** — record the portfolio's value at today's close.
+4. At the end, turn that daily value history (the "equity curve") into the summary **metrics**
+   you see in the table, and do the exact same thing for buy-and-hold so you can compare.
+
+The signal is computed at a day's close and executed at that *same* close — a simplification.
+Real fills happen a moment later at a slightly worse price, which is what the slippage cost stands
+in for. Live results are always worse than a backtest; plan for it.
+
 ## Strategies
 
 Every run pits the chosen strategy against a **buy-and-hold** benchmark. Each lives in its own
@@ -50,6 +92,29 @@ in so it is obvious which strategies actually beat it.
 The trend rules **buy strength**; `rsi` deliberately **buys weakness** — comparing them shows
 how a strategy's style interacts with a market's character (e.g. mean-reversion tends to bleed
 in a strong bull market).
+
+### What each strategy is actually betting on
+
+- **`sma-cross` (simple moving-average crossover)** — a *moving average* is just the average
+  price over the last N days, which smooths out the daily noise. This rule holds the asset while
+  a **short** average (say 20 days, reacting quickly) sits above a **long** one (say 50 days,
+  the slower trend), and moves to cash when the short drops below. The bet: *trends persist* —
+  once something is going up, it tends to keep going. `--fast`/`--slow` set the two windows.
+- **`ema-cross` (exponential moving-average crossover)** — identical idea, but the averages
+  weight recent days more heavily, so they turn sooner. That means it catches trend changes
+  earlier but also gets faked out more often in choppy markets ("whipsaws").
+- **`momentum`** — the simplest trend bet: are we higher than we were `--lookback` days ago? If
+  yes, hold; if no, cash. No averaging, just two price points.
+- **`rsi` (Relative Strength Index)** — RSI is a 0–100 gauge of how one-sided recent moves have
+  been; low means "sold off hard recently." This rule **buys the dip** — it goes in when RSI is
+  below `--rsi-threshold` (default 30, "oversold"). The bet is *mean reversion*: after a sharp
+  drop, prices bounce. This is the opposite instinct to the trend rules, and it often loses in a
+  steady bull market (it keeps selling winners and buying fallers).
+- **`donchian` (channel breakout, the classic "Turtle" rule)** — enter when today's close is the
+  highest in the last `--entry` days (a breakout to new highs), and exit when it's the lowest in
+  the last `--exit` days. It holds through everything in between, so it rides big trends but
+  gives back some profit at every turn.
+- **`buy-hold`** — the benchmark: buy once, hold forever. No skill, no trading, minimal cost.
 
 Add your own by implementing `strategy.Strategy` — a `Target(closes) → weight` method — in a new
 file under `internal/strategy/`, then register it in `pipeline.buildStrategy`. Target is called
@@ -74,6 +139,77 @@ the cost of total return. The buy-and-hold benchmark is deliberately left **unsc
 comparison stays honest. Holding a fractional weight rebalances as prices drift; the engine's
 rebalance band (1% of equity by default) keeps that churn to periodic, low-cost trades rather
 than a trade every bar.
+
+## Understanding the output
+
+Here is a real run — `sma-cross` vs buy-and-hold on the Nifty 50, 2019–2024, ₹10,000:
+
+```
+| Strategy         |   Total |   CAGR | Ann. vol | Sharpe | Sortino | Max DD | Calmar |     Final | Trades | Exposure |   Costs |
+| sma-cross(20/50) | 116.09% | 13.71% |   11.79% |   1.17 |    1.73 | 20.64% |   0.66 | ₹21608.62 |     25 |   67.59% | ₹612.01 |
+| buy-hold         | 119.09% | 13.97% |   18.36% |   0.82 |    1.12 | 38.44% |   0.36 | ₹21875.71 |      1 |  100.00% |  ₹14.98 |
+```
+
+Read it one column at a time:
+
+- **Strategy** — the rule and its settings, e.g. `sma-cross(20/50)` = simple crossover with a
+  20-day fast and 50-day slow average. A `+voltgt(10%/20)` suffix means volatility targeting is on.
+- **Total** — total return over the whole period. `116%` means ₹10,000 became ₹21,600. Simple to
+  grasp but misleading alone: it ignores how long it took and how scary the ride was.
+- **CAGR** (Compound Annual Growth Rate) — that same return as a smooth *per-year* rate. `13.71%`
+  means "as if it grew 13.71% every year." The fair way to compare periods of different lengths.
+- **Ann. vol** (annualised volatility) — how bumpy the daily ride was, per year. Higher = wilder
+  swings. Note buy-hold's `18.36%` vs the strategy's `11.79%`: the strategy was much calmer.
+- **Sharpe ratio** — **return per unit of risk** (roughly CAGR ÷ volatility). The most quoted
+  number in investing. Higher is better; above 1 is good, above 2 is excellent (and usually too
+  good to be true). Here the strategy's `1.17` beats buy-hold's `0.82` — nearly the same money
+  with far less turbulence. This is why `--sort sharpe` reshuffles the table.
+- **Sortino ratio** — like Sharpe, but it only counts *downside* wobble as risk (nobody minds
+  their portfolio jumping *up*). Usually a bit higher than Sharpe; a big gap means the volatility
+  was mostly to the upside.
+- **Max DD** (maximum drawdown) — the worst peak-to-trough fall you'd have endured. Buy-hold's
+  `38.44%` (the 2020 crash) vs the strategy's `20.64%` is the real story: same money, half the
+  pain. This number decides whether you could actually hold a strategy without panic-selling.
+- **Calmar ratio** — CAGR ÷ max drawdown: return per unit of worst-case pain. Another
+  "is the reward worth the fear?" gauge.
+- **Final** — the ending pot, starting from your `--capital`.
+- **Trades** — how many days it traded. Buy-hold trades once (buy and sit). More trades means
+  more cost and more chances to be wrong.
+- **Exposure** — the share of days it held any position. `67.59%` means it was invested
+  two-thirds of the time and in cash the rest. Buy-hold is `100%` by definition.
+- **Costs** — total brokerage + tax + slippage paid. Buy-hold's `₹14.98` vs the strategy's `₹612`
+  is the price of all that trading — a real drag the strategy must overcome.
+
+**The note under the table** gives the headline: how many strategies beat buy-and-hold, or a
+warning that this one didn't. Take it seriously — beating the benchmark on *past* data is the
+bare minimum, not proof of anything.
+
+### So which strategy is "best"?
+
+There is no single answer — it depends what you care about:
+
+- Chasing the biggest number? Sort by `--sort return` or `cagr`.
+- Want the smoothest ride / best risk-adjusted return? Sort by `sharpe` or `sortino`.
+- Most worried about a gut-wrenching crash? Sort by `drawdown` (lowest is safest) or `calmar`.
+
+In the example, buy-hold "wins" on raw return, but the crossover wins on *every* risk-adjusted
+measure — almost the same money with half the drawdown. Which you'd actually prefer is a personal
+question about how much volatility you can stomach.
+
+## Reading results honestly (common traps)
+
+- **Beating buy-and-hold once proves nothing.** With six strategies and a handful of parameters,
+  *something* will look good on any single history by pure luck. That is why Phase 2 (below)
+  exists.
+- **Overfitting** — if you tweak `--fast`/`--slow` until the numbers sparkle, you've fitted the
+  rule to noise in *this* history; it will disappoint on the next. Prefer settings that work
+  across a *range* of values, not a magic single point.
+- **Costs and slippage are optimistic here.** Real spreads, taxes and impact are worse, especially
+  on small or illiquid names. If an edge only survives at zero cost, it isn't an edge.
+- **This uses raw closes.** Dividends and stock splits aren't adjusted for, so use adjusted-close
+  symbols where you can. It's also one asset at a time — no portfolio diversification yet.
+- **The past is not the future.** A backtest assumes tomorrow's market behaves like the sample.
+  Crashes, regime shifts and new regulations don't ask permission.
 
 ## Usage
 
