@@ -1,0 +1,103 @@
+# backtest
+
+A tiny, offline **backtester** for rule-based strategies on Indian (NSE) daily data. It runs a
+strategy *and* a buy-and-hold benchmark over the same price history, charges realistic costs,
+and reports whether the strategy actually earned its complexity.
+
+Pure Go standard library, no external dependencies. Data is fetched once from Yahoo Finance
+(key-less) into a CSV; everything after that is offline and reproducible.
+
+> **This is a research tool, not a trading system.** A backtest is a *hypothesis fit to the
+> past* — it ignores regime change, survivorship, and execution reality, and it flatters
+> strategies that overfit. Output is **not investment advice**. Prove an edge here, paper-trade
+> it, and only then consider tiny real capital.
+
+## Quickstart
+
+```sh
+cd backtest
+
+# 1. Fetch daily closes for the symbols in data/tickers.txt (Yahoo Finance).
+go run ./cmd/backtest fetch prices --start 2019-01-01 --end 2024-12-31 > data/nifty.csv
+
+# 2. Backtest a 50/200 SMA crossover on the Nifty 50, vs buy-and-hold.
+go run ./cmd/backtest run --prices data/nifty.csv --symbol NIFTY50 \
+  --strategy sma-cross --fast 50 --slow 200 --capital 10000
+```
+
+Expect most simple rules to **lose to buy-and-hold after costs** — discovering that cheaply is
+the entire point.
+
+## Strategies
+
+- `sma-cross` (default) — long while the fast simple moving average is above the slow one, else
+  in cash. The textbook trend-following rule. Windows via `--fast` / `--slow`.
+- `buy-hold` — always fully invested. Also always run automatically as the benchmark.
+
+Add your own by implementing `strategy.Strategy` (a pure `Target(closes) → weight` function)
+and wiring it into `pipeline.buildStrategy`.
+
+## Usage
+
+```
+backtest run --prices <csv> [flags]
+
+  --prices         price CSV file (columns: date,symbol,close) (required)
+  --symbol         which symbol in the CSV to test (default: first found)
+  --strategy       sma-cross | buy-hold (default sma-cross)
+  --fast           fast SMA window (default 20)
+  --slow           slow SMA window (default 50)
+  --capital        initial capital in INR (default 100000)
+  --brokerage-bps  brokerage per trade, basis points (default 0)
+  --stt-bps        securities transaction tax per trade, basis points (default 10)
+  --slippage-bps   assumed slippage per trade, basis points (default 5)
+  --format         comma-separated: md,csv,json (default md)
+  --out            output directory (default: print to stdout)
+
+backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
+```
+
+## CSV format
+
+Prices (long form; one file may hold many symbols):
+
+```
+date,symbol,close
+2024-06-14,NIFTY50,23465.60
+```
+
+NSE cash symbols use a `.NS` Yahoo suffix (e.g. `NIFTYBEES.NS`); indices are prefixed with `^`
+(e.g. `^NSEI` for the Nifty 50). Edit `data/tickers.txt` to change what `fetch` pulls.
+
+## Method & caveats
+
+- **Close-to-close, long/flat, fractional shares.** The signal for bar *i* is computed from
+  closes up to and including *i* and executed at that same close. Real fills happen later and at
+  a different price — `--slippage-bps` is the crude stand-in. Signals never see future bars
+  (no lookahead).
+- **Costs are charged on every trade's notional**: brokerage + STT + slippage, each in basis
+  points. Defaults approximate NSE cash-delivery friction and are deliberately conservative —
+  underestimating costs is how backtests lie. A no-trade band (1 bp of equity) stops a
+  constant-weight rule from churning to unwind its own fee drag.
+- **Metrics**: total return, CAGR (over the actual calendar span), annualised volatility and
+  Sharpe (252 trading days, zero risk-free rate), max drawdown, trades, turnover and exposure.
+- **Money is `float64`**, not `math/big.Rat` — like the sibling `correlation` module, this is
+  statistics rather than tax accounting, where a paisa of rounding is immaterial.
+- **One asset, one series at a time.** No portfolios, shorting, leverage, intraday bars, or
+  corporate-action adjustment yet. Use adjusted-close symbols where possible.
+
+## Development
+
+```sh
+cd backtest
+go test ./...                              # all tests
+go test -race ./...                        # what CI runs
+go test ./internal/pipeline -update        # refresh golden files after an intended change
+go vet ./... && gofmt -l .                 # gofmt must print nothing
+```
+
+The golden test in `internal/pipeline` locks the whole offline render path against a synthetic
+fixture. After an **intended** output change, run it with `-update` and review the diff of
+`internal/pipeline/testdata/golden/*` before committing — never blind-update.
+
+> **Disclaimer:** Not investment advice. Every backtest is a draft to sanity-check yourself.

@@ -33,6 +33,11 @@ schedule-fa/data/prices/*.csv
 correlation/data/*.csv
 correlation/correlation
 
+# backtest: fetched market data and built binary (not vendored)
+# testdata/ holds the committed synthetic golden fixture, so only data/ is ignored.
+backtest/data/*.csv
+backtest/backtest
+
 # Python bytecode
 __pycache__/
 *.pyc

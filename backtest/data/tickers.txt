@@ -1,0 +1,5 @@
+# Tickers to fetch daily closes for (Yahoo Finance symbols).
+# Format: <label> <yahoo-symbol>
+# NSE cash symbols use a ".NS" suffix; indices are prefixed with "^".
+NIFTY50   ^NSEI
+NIFTYBEES NIFTYBEES.NS

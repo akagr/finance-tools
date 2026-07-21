@@ -4,9 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A monorepo of Go tools for Indian tax filing. Currently one tool: **`schedule-fa/`** — a CLI
-that turns Interactive Brokers (IBKR) holdings into a **Schedule FA** (Foreign Assets) report
-for the Indian ITR. Zero external dependencies (Go stdlib only); Go 1.26.
+A monorepo of Go tools for Indian investors, all zero-dependency (Go stdlib only), Go 1.26,
+in one `go.work` workspace:
+
+- **`schedule-fa/`** — a CLI that turns Interactive Brokers (IBKR) holdings into a **Schedule
+  FA** (Foreign Assets) report for the Indian ITR. The most developed tool; most of this doc
+  is about it.
+- **`correlation/`** — computes return **correlations** across assets to gauge portfolio
+  diversification (CSV/Yahoo-driven, md/csv/json output).
+- **`backtest/`** — an offline **backtester** for rule-based strategies on NSE daily data
+  (SMA-crossover vs buy-and-hold, realistic costs). A research tool: output is not advice, and
+  a backtest is a hypothesis fit to the past, not a forecast. See `backtest/README.md`.
 
 ## Commands
 

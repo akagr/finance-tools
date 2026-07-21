@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "symbol": "SYNTH",
+    "start": "2023-01-02",
+    "end": "2023-06-16",
+    "bars": 120,
+    "initial_capital": 100000,
+    "brokerage_bps": 0,
+    "stt_bps": 10,
+    "slippage_bps": 5
+  },
+  "lines": [
+    {
+      "strategy": "sma-cross(5/20)",
+      "total_return": 0.12777381785568687,
+      "cagr": 0.3049700236181623,
+      "ann_vol": 0.06411733764964858,
+      "sharpe": 4.00515016668341,
+      "max_drawdown": 0.035733595315918215,
+      "final_value": 112777.38178556868,
+      "trades": 6,
+      "turnover": 620859.8637992241,
+      "total_cost": 931.2897956988362,
+      "exposure": 0.43333333333333335
+    },
+    {
+      "strategy": "buy-hold",
+      "total_return": 0.12081572775624694,
+      "cagr": 0.28721396546333633,
+      "ann_vol": 0.08936977037308749,
+      "sharpe": 2.748152011489488,
+      "max_drawdown": 0.08241063233550508,
+      "final_value": 111913.7026,
+      "trades": 1,
+      "turnover": 99850,
+      "total_cost": 149.775,
+      "exposure": 1
+    }
+  ]
+}
