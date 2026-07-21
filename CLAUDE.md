@@ -13,8 +13,10 @@ in one `go.work` workspace:
 - **`correlation/`** — computes return **correlations** across assets to gauge portfolio
   diversification (CSV/Yahoo-driven, md/csv/json output).
 - **`backtest/`** — an offline **backtester** for rule-based strategies on NSE daily data
-  (SMA-crossover vs buy-and-hold, realistic costs). A research tool: output is not advice, and
-  a backtest is a hypothesis fit to the past, not a forecast. See `backtest/README.md`.
+  (trend, momentum, mean-reversion and breakout rules vs a buy-and-hold benchmark, realistic
+  costs). Each strategy lives in its own file under `internal/strategy/` and is registered in
+  `pipeline.buildStrategy`. A research tool: output is not advice, and a backtest is a
+  hypothesis fit to the past, not a forecast. See `backtest/README.md`.
 
 ## Commands
 

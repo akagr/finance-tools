@@ -18,9 +18,14 @@ import (
 type Options struct {
 	PricesPath     string  // CSV file (columns: date,symbol,close)
 	Symbol         string  // which symbol in the CSV to test; "" = first found
-	Strategy       string  // "sma-cross" (only active strategy for now)
-	Fast           int     // fast SMA window (sma-cross)
-	Slow           int     // slow SMA window (sma-cross)
+	Strategy       string  // sma-cross|ema-cross|momentum|rsi|donchian|buy-hold
+	Fast           int     // fast MA window (sma-cross, ema-cross)
+	Slow           int     // slow MA window (sma-cross, ema-cross)
+	Lookback       int     // lookback window (momentum)
+	RSIPeriod      int     // RSI period (rsi)
+	RSIThreshold   float64 // buy when RSI is below this (rsi)
+	DonchianEntry  int     // breakout entry window (donchian)
+	DonchianExit   int     // breakdown exit window (donchian)
 	InitialCapital float64 // starting cash; defaults to 100000 if <= 0
 	Costs          engine.Costs
 }
@@ -120,17 +125,32 @@ func pick(all []series.Series, symbol string) (series.Series, error) {
 func buildStrategy(opts Options) (strategy.Strategy, error) {
 	switch opts.Strategy {
 	case "", "sma-cross":
-		fast, slow := opts.Fast, opts.Slow
-		if fast == 0 {
-			fast = 20
-		}
-		if slow == 0 {
-			slow = 50
-		}
-		return strategy.NewSMACross(fast, slow)
+		return strategy.NewSMACross(orDefaultInt(opts.Fast, 20), orDefaultInt(opts.Slow, 50))
+	case "ema-cross":
+		return strategy.NewEMACross(orDefaultInt(opts.Fast, 20), orDefaultInt(opts.Slow, 50))
+	case "momentum":
+		return strategy.NewMomentum(orDefaultInt(opts.Lookback, 120))
+	case "rsi":
+		return strategy.NewRSI(orDefaultInt(opts.RSIPeriod, 14), orDefaultFloat(opts.RSIThreshold, 30))
+	case "donchian":
+		return strategy.NewDonchian(orDefaultInt(opts.DonchianEntry, 20), orDefaultInt(opts.DonchianExit, 10))
 	case "buy-hold":
 		return strategy.BuyHold{}, nil
 	default:
-		return nil, fmt.Errorf("pipeline: unknown strategy %q (want sma-cross|buy-hold)", opts.Strategy)
+		return nil, fmt.Errorf("pipeline: unknown strategy %q (want sma-cross|ema-cross|momentum|rsi|donchian|buy-hold)", opts.Strategy)
 	}
+}
+
+func orDefaultInt(v, def int) int {
+	if v == 0 {
+		return def
+	}
+	return v
+}
+
+func orDefaultFloat(v, def float64) float64 {
+	if v == 0 {
+		return def
+	}
+	return v
 }

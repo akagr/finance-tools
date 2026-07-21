@@ -30,12 +30,27 @@ the entire point.
 
 ## Strategies
 
-- `sma-cross` (default) — long while the fast simple moving average is above the slow one, else
-  in cash. The textbook trend-following rule. Windows via `--fast` / `--slow`.
-- `buy-hold` — always fully invested. Also always run automatically as the benchmark.
+Every run pits the chosen strategy against a **buy-and-hold** benchmark. Each lives in its own
+file under `internal/strategy/`.
 
-Add your own by implementing `strategy.Strategy` (a pure `Target(closes) → weight` function)
-and wiring it into `pipeline.buildStrategy`.
+| Name        | Style          | Rule                                                                   | Flags                          |
+|-------------|----------------|------------------------------------------------------------------------|--------------------------------|
+| `sma-cross` | trend (default)| long while the fast **simple** MA is above the slow MA, else cash      | `--fast` `--slow`              |
+| `ema-cross` | trend          | same, with **exponential** MAs (reacts sooner, more whipsaws)          | `--fast` `--slow`              |
+| `momentum`  | trend          | long while price is above its own level `--lookback` bars ago          | `--lookback`                   |
+| `rsi`       | mean-reversion | buy when oversold (RSI below `--rsi-threshold`), else cash             | `--rsi-period` `--rsi-threshold` |
+| `donchian`  | breakout       | enter on a new `--entry`-bar high, exit on a new `--exit`-bar low       | `--entry` `--exit`             |
+| `buy-hold`  | benchmark      | always fully invested                                                  | —                              |
+
+The trend rules **buy strength**; `rsi` deliberately **buys weakness** — comparing them shows
+how a strategy's style interacts with a market's character (e.g. mean-reversion tends to bleed
+in a strong bull market).
+
+Add your own by implementing `strategy.Strategy` — a `Target(closes) → weight` method — in a new
+file under `internal/strategy/`, then register it in `pipeline.buildStrategy`. Target is called
+once per bar in order; most rules are pure functions of the history passed, but a strategy may
+carry state across calls for entry/exit hysteresis (see `donchian.go`). It must never read past
+the slice it is given (no lookahead).
 
 ## Usage
 
@@ -44,9 +59,14 @@ backtest run --prices <csv> [flags]
 
   --prices         price CSV file (columns: date,symbol,close) (required)
   --symbol         which symbol in the CSV to test (default: first found)
-  --strategy       sma-cross | buy-hold (default sma-cross)
-  --fast           fast SMA window (default 20)
-  --slow           slow SMA window (default 50)
+  --strategy       sma-cross | ema-cross | momentum | rsi | donchian | buy-hold (default sma-cross)
+  --fast           fast MA window, sma-cross/ema-cross (default 20)
+  --slow           slow MA window, sma-cross/ema-cross (default 50)
+  --lookback       lookback window in bars, momentum (default 120)
+  --rsi-period     RSI period, rsi (default 14)
+  --rsi-threshold  buy when RSI is below this, rsi (default 30)
+  --entry          breakout entry window in bars, donchian (default 20)
+  --exit           breakdown exit window in bars, donchian (default 10)
   --capital        initial capital in INR (default 100000)
   --brokerage-bps  brokerage per trade, basis points (default 0)
   --stt-bps        securities transaction tax per trade, basis points (default 10)

@@ -56,10 +56,18 @@ func usage(w *os.File) {
 
 Usage:
   backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
-  backtest run --prices <csv> [--symbol <s>] [--strategy sma-cross] [--fast 20] [--slow 50] [flags]
+  backtest run --prices <csv> [--symbol <s>] [--strategy <name>] [strategy flags]
   backtest version
 
-Run "backtest run -h" for flags.
+Strategies (each is run against a buy-and-hold benchmark):
+  sma-cross   simple MA crossover      flags: --fast --slow
+  ema-cross   exponential MA crossover flags: --fast --slow
+  momentum    time-series momentum     flag:  --lookback
+  rsi         RSI oversold (contrarian) flags: --rsi-period --rsi-threshold
+  donchian    channel breakout (Turtle) flags: --entry --exit
+  buy-hold    always fully invested
+
+Run "backtest run -h" for all flags.
 
 %s
 `, disclaimer)
@@ -68,17 +76,22 @@ Run "backtest run -h" for flags.
 func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	var (
-		pricesP = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
-		symbol  = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat   = fs.String("strategy", "sma-cross", "strategy: sma-cross|buy-hold")
-		fast    = fs.Int("fast", 20, "fast SMA window (sma-cross)")
-		slow    = fs.Int("slow", 50, "slow SMA window (sma-cross)")
-		capital = fs.Float64("capital", 100000, "initial capital in INR")
-		brokBps = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
-		sttBps  = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
-		slipBps = fs.Float64("slippage-bps", 5, "assumed slippage per trade, basis points")
-		format  = fs.String("format", "md", "comma-separated output formats: md,csv,json")
-		out     = fs.String("out", "", "output directory (default: print to stdout)")
+		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
+		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
+		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
+		slow      = fs.Int("slow", 50, "slow MA window (sma-cross, ema-cross)")
+		lookback  = fs.Int("lookback", 120, "lookback window in bars (momentum)")
+		rsiPeriod = fs.Int("rsi-period", 14, "RSI period (rsi)")
+		rsiThresh = fs.Float64("rsi-threshold", 30, "buy when RSI is below this (rsi)")
+		entry     = fs.Int("entry", 20, "breakout entry window in bars (donchian)")
+		exit      = fs.Int("exit", 10, "breakdown exit window in bars (donchian)")
+		capital   = fs.Float64("capital", 100000, "initial capital in INR")
+		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
+		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
+		slipBps   = fs.Float64("slippage-bps", 5, "assumed slippage per trade, basis points")
+		format    = fs.String("format", "md", "comma-separated output formats: md,csv,json")
+		out       = fs.String("out", "", "output directory (default: print to stdout)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -94,6 +107,11 @@ func cmdRun(args []string) int {
 		Strategy:       *strat,
 		Fast:           *fast,
 		Slow:           *slow,
+		Lookback:       *lookback,
+		RSIPeriod:      *rsiPeriod,
+		RSIThreshold:   *rsiThresh,
+		DonchianEntry:  *entry,
+		DonchianExit:   *exit,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 	})

@@ -64,3 +64,27 @@ func TestGoldenSMACross(t *testing.T) {
 	checkGolden(t, "sma_cross.csv", render(t, opts, "csv"))
 	checkGolden(t, "sma_cross.json", render(t, opts, "json"))
 }
+
+// Locks the render + strategy path for each remaining strategy against the same
+// synthetic fixture (Markdown only, to keep the golden set manageable).
+func TestGoldenStrategies(t *testing.T) {
+	base := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+	}
+	cases := []struct {
+		golden string
+		mutate func(*Options)
+	}{
+		{"ema_cross.md", func(o *Options) { o.Strategy = "ema-cross"; o.Fast = 5; o.Slow = 20 }},
+		{"momentum.md", func(o *Options) { o.Strategy = "momentum"; o.Lookback = 20 }},
+		{"rsi.md", func(o *Options) { o.Strategy = "rsi"; o.RSIPeriod = 14; o.RSIThreshold = 45 }},
+		{"donchian.md", func(o *Options) { o.Strategy = "donchian"; o.DonchianEntry = 20; o.DonchianExit = 10 }},
+	}
+	for _, c := range cases {
+		opts := base
+		c.mutate(&opts)
+		checkGolden(t, c.golden, render(t, opts, "md"))
+	}
+}

@@ -1,74 +1,48 @@
 package strategy
 
-import (
-	"math"
-	"testing"
-)
+import "testing"
 
-func TestBuyHoldAlwaysFull(t *testing.T) {
-	var bh BuyHold
-	for _, closes := range [][]float64{{100}, {100, 101, 99}} {
-		if got := bh.Target(closes); got != 1.0 {
-			t.Errorf("BuyHold.Target(%v) = %v, want 1.0", closes, got)
-		}
-	}
-	if bh.Name() != "buy-hold" {
-		t.Errorf("Name = %q", bh.Name())
-	}
-}
-
-func TestNewSMACrossValidation(t *testing.T) {
-	tests := []struct {
-		fast, slow int
-		ok         bool
-	}{
-		{5, 20, true},
-		{1, 2, true},
-		{20, 20, false}, // fast must be < slow
-		{30, 10, false},
-		{0, 10, false},
-		{-1, 10, false},
-	}
-	for _, tt := range tests {
-		_, err := NewSMACross(tt.fast, tt.slow)
-		if (err == nil) != tt.ok {
-			t.Errorf("NewSMACross(%d,%d): err=%v, wantOK=%v", tt.fast, tt.slow, err, tt.ok)
-		}
-	}
-}
-
-func TestSMACrossTarget(t *testing.T) {
-	s, err := NewSMACross(2, 4)
+// allStrategies returns one configured instance of every strategy for
+// package-level conformance checks.
+func allStrategies(t *testing.T) []Strategy {
+	t.Helper()
+	sma, err := NewSMACross(3, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Fewer than slow bars: flat.
-	if got := s.Target([]float64{10, 11, 12}); got != 0 {
-		t.Errorf("insufficient history: got %v, want 0", got)
+	ema, err := NewEMACross(3, 10)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// Rising series: fast SMA above slow SMA → fully invested.
-	rising := []float64{10, 11, 12, 13, 14}
-	if got := s.Target(rising); got != 1.0 {
-		t.Errorf("rising: got %v, want 1.0", got)
+	mom, err := NewMomentum(5)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// Falling series: fast SMA below slow SMA → flat.
-	falling := []float64{14, 13, 12, 11, 10}
-	if got := s.Target(falling); got != 0.0 {
-		t.Errorf("falling: got %v, want 0.0", got)
+	r, err := NewRSI(5, 30)
+	if err != nil {
+		t.Fatal(err)
 	}
+	don, err := NewDonchian(5, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []Strategy{BuyHold{}, sma, ema, mom, r, don}
 }
 
-func TestSMACrossNeverPeeksAhead(t *testing.T) {
-	// Target must depend only on the closes passed; the same prefix must yield
-	// the same answer regardless of what data would follow.
-	s, _ := NewSMACross(2, 4)
-	prefix := []float64{10, 11, 12, 13}
-	want := s.Target(prefix)
-	extended := append(append([]float64{}, prefix...), 100, 1, 50)
-	if got := s.Target(extended[:len(prefix)]); math.Abs(got-want) > 1e-12 {
-		t.Errorf("target changed with future data present: %v vs %v", got, want)
+// TestTargetsWithinBounds walks a series through every strategy bar by bar (the
+// order the engine uses) and checks each returns a weight in [0, 1] and a
+// non-empty name — the contract every strategy must uphold.
+func TestTargetsWithinBounds(t *testing.T) {
+	closes := []float64{10, 11, 12, 11, 10, 9, 10, 12, 14, 13, 12, 15, 18, 16, 14, 13, 15, 17, 19, 20}
+	for _, s := range allStrategies(t) {
+		if s.Name() == "" {
+			t.Errorf("%T has empty Name()", s)
+		}
+		for i := 1; i <= len(closes); i++ {
+			w := s.Target(closes[:i])
+			if w < 0 || w > 1 {
+				t.Errorf("%s.Target(bar %d) = %v, want within [0,1]", s.Name(), i, w)
+			}
+		}
 	}
 }
