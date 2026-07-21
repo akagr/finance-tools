@@ -19,9 +19,10 @@ in one `go.work` workspace:
   `--vol-target` adds a volatility-targeting position-sizing overlay (the benchmark stays
   unscaled). A `walkforward` command splits history into out-of-sample folds (with `--optimize`
   re-fitting parameters per fold), and a `sweep` command maps the metric surface over a 1-D/2-D
-  parameter grid (plateau vs overfit spike), and a `montecarlo` command bootstraps daily returns
-  to gauge how much of a result is luck. A research tool: output is not advice, and a backtest is
-  a hypothesis fit to the past, not a forecast. See `backtest/README.md`.
+  parameter grid (plateau vs overfit spike), a `montecarlo` command bootstraps daily returns to
+  gauge how much of a result is luck, and a `regime` command splits performance by market state
+  (bull/bear, high/low vol). A research tool: output is not advice, and a backtest is a hypothesis
+  fit to the past, not a forecast. See `backtest/README.md`.
 
 ## Commands
 

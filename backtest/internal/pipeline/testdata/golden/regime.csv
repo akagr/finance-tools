@@ -1,0 +1,5 @@
+group,regime,days,strategy_return,benchmark_return,edge,strategy_sharpe
+Trend,Bull,50,0.2466,0.2163,0.0303,16.3182
+Trend,Bear,49,0.0299,-0.1197,0.1496,5.1258
+Volatility,High vol,55,0.1156,0.0361,0.0794,7.6248
+Volatility,Low vol,54,0.1437,0.0068,0.1369,11.5878

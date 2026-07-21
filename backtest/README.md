@@ -390,6 +390,38 @@ Reproducible via `--seed` (fixed by default) and `--trials` (default 1000). Cave
 bootstrap shuffles days *independently*, so it captures **sampling luck** but not autocorrelation
 or regime effects — read it alongside walk-forward, not instead of it.
 
+## Regime analysis: where does the edge come from?
+
+Two strategies with the same overall return can be completely different animals: one might grind
+out steady gains in calm markets, another might do nothing for years then shine in a crash.
+`regime` splits performance by **market state** so you can see which:
+
+```sh
+go run ./cmd/backtest regime --prices data/nifty.csv --symbol NIFTY50 \
+  --strategy sma-cross --fast 50 --slow 200
+```
+
+Each day is labelled two ways — **trend** (price above/below its long moving average → bull/bear)
+and **volatility** (recent volatility above/below the sample median → high/low) — and the
+strategy's return is compounded within each bucket next to buy-and-hold:
+
+```
+| Regime                | Days | Strategy | Buy & hold |    Edge | Sharpe |
+| Trend · Bull          | 1777 |   70.57% |    103.36% | -32.79% |   0.68 |
+| Trend · Bear          |  481 |  -10.37% |     41.22% | -51.60% |  -0.33 |
+| Volatility · High vol | 1220 |    8.94% |     62.57% | -53.63% |   0.20 |
+| Volatility · Low vol  | 1218 |   40.33% |     65.33% | -24.99% |   0.75 |
+```
+
+Read the **Edge** column across regimes. If a strategy only beats buy-and-hold in *one* state,
+its usefulness depends on that state recurring — a fragile bet. A trend rule that adds value
+specifically in bear/high-vol markets (by sitting in cash) is doing its intended job; one whose
+only edge is in calm bull markets is just leveraged beta in disguise.
+
+Tune the splits with `--trend-ma` (default 200) and `--vol-window` (default 20). Note the labels
+are **descriptive** — the volatility threshold uses the whole sample's median — so this explains
+the past, it isn't itself a lookahead-free trading signal.
+
 ## Usage
 
 ```
@@ -429,6 +461,10 @@ backtest sweep --prices <csv> --strategy <name> [--param name:min:max:step ...] 
 backtest montecarlo --prices <csv> --strategy <name> [--trials N] [--seed S] [strategy/cost flags]
   --trials         number of bootstrap trials (default 1000)
   --seed           random seed, fixed for reproducibility (default 1)
+
+backtest regime --prices <csv> --strategy <name> [--trend-ma N] [--vol-window N] [strategy flags]
+  --trend-ma       moving-average window for the bull/bear split (default 200)
+  --vol-window     trailing window for the high/low volatility split (default 20)
 
 backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
 ```
@@ -485,15 +521,24 @@ band. Next:
 - Multi-asset **portfolios** (cross-sectional momentum, equal-risk weighting) and long/short.
 - Optional stop-loss / trailing-stop and a configurable rebalance calendar.
 
-**Phase 2 — Robustness & validation.** Stop fooling yourself. A single backtest is the *most*
-flattering number a strategy will ever show. Delivered so far: **walk-forward** analysis
-(`walkforward`), **parameter sweeps** (`sweep`) that map the performance surface (including
-**cost-sensitivity** sweeps over slippage/brokerage/STT), and **walk-forward optimisation**
-(`walkforward --optimize`) that re-fits parameters on each training window and tests them
-out-of-sample — the most honest estimate here of live performance, and **Monte-Carlo** bootstrap
-(`montecarlo`) that resamples daily returns to show how much of a result could be luck. Next:
+**Phase 2 — Robustness & validation** *(complete)*. Stop fooling yourself — a single backtest is
+the *most* flattering number a strategy will ever show. This phase stress-tests an edge from every
+angle:
 
-- Regime analysis: split performance by market state (bull/bear, high/low volatility).
+- **Walk-forward** (`walkforward`) — is a fixed rule consistent across consecutive out-of-sample
+  folds, or was it one lucky stretch?
+- **Parameter sweeps** (`sweep`) — is the good region a robust plateau or an overfit spike?
+  Including **cost-sensitivity** sweeps over slippage/brokerage/STT.
+- **Walk-forward optimisation** (`walkforward --optimize`, anchored or `--rolling`) — re-fit
+  parameters on each training window and test them out-of-sample; the most honest estimate here
+  of live performance.
+- **Monte-Carlo** (`montecarlo`) — bootstrap the daily returns to show how much of the result
+  could be luck.
+- **Regime analysis** (`regime`) — split performance by market state (bull/bear, high/low vol) to
+  see where the edge actually comes from.
+
+The recurring verdict on these toy strategies over Nifty: **no robust, transferable edge** — which
+is Phase 2 doing its job, cheaply, before any capital is at risk.
 
 **Phase 3 — Paper trading (zero capital).** Wire the surviving strategy to a **live data feed**
 and place *simulated* orders for weeks. Validates data plumbing, latency, and real slippage

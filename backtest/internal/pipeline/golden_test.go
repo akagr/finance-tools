@@ -198,6 +198,32 @@ func TestGoldenMonteCarlo(t *testing.T) {
 	checkGolden(t, "montecarlo.json", renderMC("json"))
 }
 
+// Locks the regime-analysis render path.
+func TestGoldenRegime(t *testing.T) {
+	opts := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		Strategy:       "sma-cross",
+		Fast:           3,
+		Slow:           8,
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+	}
+	rg, err := BuildRegime(opts, 20, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderRg := func(format string) []byte {
+		var buf bytes.Buffer
+		if err := report.RenderRegime(&buf, rg, format); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+	checkGolden(t, "regime.md", renderRg("md"))
+	checkGolden(t, "regime.csv", renderRg("csv"))
+	checkGolden(t, "regime.json", renderRg("json"))
+}
+
 // Locks the parameter-sweep render path: a 2-D crossover grid (with invalid
 // cells) and a 1-D momentum sweep.
 func TestGoldenSweep(t *testing.T) {

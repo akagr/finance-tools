@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "symbol": "SYNTH",
+    "strategy": "sma-cross(3/8)",
+    "start": "2023-01-02",
+    "end": "2023-06-16",
+    "bars": 120,
+    "trend_ma": 20,
+    "vol_window": 10,
+    "notes": [
+      "The strategy's edge over buy-and-hold is largest in the Bear regime (+15.0%) and weakest in Bull (+3.0%). An edge concentrated in one regime only pays off when that regime recurs — size your confidence accordingly.",
+      "Regime labels are descriptive: the high/low-vol split uses the whole sample's median, so this explains the past rather than being a lookahead-free trading signal."
+    ]
+  },
+  "buckets": [
+    {
+      "group": "Trend",
+      "name": "Bull",
+      "days": 50,
+      "strategy_return": 0.24660864616607214,
+      "benchmark_return": 0.21631180238531367,
+      "strategy_sharpe": 16.31820621617826
+    },
+    {
+      "group": "Trend",
+      "name": "Bear",
+      "days": 49,
+      "strategy_return": 0.029901406804798913,
+      "benchmark_return": -0.11974224400087508,
+      "strategy_sharpe": 5.125827993546184
+    },
+    {
+      "group": "Volatility",
+      "name": "High vol",
+      "days": 55,
+      "strategy_return": 0.11555993369713047,
+      "benchmark_return": 0.03614699133065691,
+      "strategy_sharpe": 7.62477756345772
+    },
+    {
+      "group": "Volatility",
+      "name": "Low vol",
+      "days": 54,
+      "strategy_return": 0.1437223326831778,
+      "benchmark_return": 0.006814217439022885,
+      "strategy_sharpe": 11.587797927608866
+    }
+  ]
+}

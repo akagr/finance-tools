@@ -44,6 +44,8 @@ func main() {
 		os.Exit(cmdSweep(os.Args[2:]))
 	case "montecarlo", "mc":
 		os.Exit(cmdMonteCarlo(os.Args[2:]))
+	case "regime":
+		os.Exit(cmdRegime(os.Args[2:]))
 	case "fetch":
 		os.Exit(cmdFetch(os.Args[2:]))
 	case "version":
@@ -66,6 +68,7 @@ Usage:
   backtest walkforward --prices <csv> --strategy <name> [--folds N] [strategy flags]
   backtest sweep --prices <csv> --strategy <name> --param name:min:max:step [--param ...] [--metric M]
   backtest montecarlo --prices <csv> --strategy <name> [--trials N] [--seed S] [strategy flags]
+  backtest regime --prices <csv> --strategy <name> [--trend-ma N] [--vol-window N] [strategy flags]
   backtest version
 
 Strategies (each is run against a buy-and-hold benchmark):
@@ -81,9 +84,9 @@ Strategies (each is run against a buy-and-hold benchmark):
 consecutive out-of-sample folds to check the edge is consistent, not a lucky stretch.
 "sweep" varies one or two parameters over a grid to see if a good result is a robust
 plateau or an overfit spike. "montecarlo" bootstraps the daily returns to show how much
-of the result could be luck.
+of the result could be luck. "regime" splits performance by market state (bull/bear, high/low vol).
 
-Run "backtest run -h", "backtest walkforward -h", "backtest sweep -h" or "backtest montecarlo -h" for all flags.
+Run "backtest run -h", "backtest walkforward -h", "backtest sweep -h", "backtest montecarlo -h" or "backtest regime -h" for all flags.
 
 %s
 `, disclaimer)
@@ -552,6 +555,96 @@ func cmdMonteCarlo(args []string) int {
 			return 1
 		}
 		if err := report.RenderMonteCarlo(file, mc, fmtName); err != nil {
+			file.Close()
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		file.Close()
+		fmt.Fprintln(os.Stderr, "wrote", path)
+	}
+	return 0
+}
+
+func cmdRegime(args []string) int {
+	fs := flag.NewFlagSet("regime", flag.ExitOnError)
+	var (
+		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
+		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
+		trendMA   = fs.Int("trend-ma", 200, "moving-average window for the bull/bear split")
+		volWindow = fs.Int("vol-window", 20, "trailing window for the high/low volatility split")
+		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
+		slow      = fs.Int("slow", 50, "slow MA window (sma-cross, ema-cross)")
+		lookback  = fs.Int("lookback", 120, "lookback window in bars (momentum)")
+		rsiPeriod = fs.Int("rsi-period", 14, "RSI period (rsi)")
+		rsiThresh = fs.Float64("rsi-threshold", 30, "buy when RSI is below this (rsi)")
+		entry     = fs.Int("entry", 20, "breakout entry window in bars (donchian)")
+		exit      = fs.Int("exit", 10, "breakdown exit window in bars (donchian)")
+		capital   = fs.Float64("capital", 100000, "initial capital in INR")
+		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
+		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
+		slipBps   = fs.Float64("slippage-bps", 5, "assumed slippage per trade, basis points")
+		volTarget = fs.Float64("vol-target", 0, "annualised volatility target in percent (e.g. 10); 0 disables position sizing")
+		volLook   = fs.Int("vol-lookback", 20, "trailing bars used to estimate realised volatility (--vol-target)")
+		format    = fs.String("format", "md", "comma-separated output formats: md,csv,json")
+		out       = fs.String("out", "", "output directory (default: print to stdout)")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *pricesP == "" {
+		fmt.Fprintln(os.Stderr, "error: --prices is required")
+		return 2
+	}
+
+	opts := pipeline.Options{
+		PricesPath:     *pricesP,
+		Symbol:         *symbol,
+		Strategy:       *strat,
+		Fast:           *fast,
+		Slow:           *slow,
+		Lookback:       *lookback,
+		RSIPeriod:      *rsiPeriod,
+		RSIThreshold:   *rsiThresh,
+		DonchianEntry:  *entry,
+		DonchianExit:   *exit,
+		InitialCapital: *capital,
+		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
+		VolTarget:      *volTarget / 100,
+		VolLookback:    *volLook,
+	}
+	rg, err := pipeline.BuildRegime(opts, *trendMA, *volWindow)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+
+	formats := splitCSV(*format)
+	if *out == "" {
+		for i, fmtName := range formats {
+			if i > 0 {
+				fmt.Println()
+			}
+			if err := report.RenderRegime(os.Stdout, rg, fmtName); err != nil {
+				fmt.Fprintln(os.Stderr, "error:", err)
+				return 1
+			}
+		}
+		return 0
+	}
+
+	if err := os.MkdirAll(*out, 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	for _, fmtName := range formats {
+		path := filepath.Join(*out, "regime."+extFor(fmtName))
+		file, err := os.Create(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		if err := report.RenderRegime(file, rg, fmtName); err != nil {
 			file.Close()
 			fmt.Fprintln(os.Stderr, "error:", err)
 			return 1
