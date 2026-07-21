@@ -1,11 +1,12 @@
 // Package pipeline is the orchestration seam shared by the CLI and the golden
-// test: it loads a price series, runs the chosen strategy and the buy-and-hold
-// benchmark through the engine, computes performance metrics, and assembles a
-// render-ready report. The command layer does I/O only.
+// test: it loads a price series, runs one strategy (or all of them) plus the
+// buy-and-hold benchmark through the engine, computes performance metrics, and
+// assembles a render-ready report. The command layer does I/O only.
 package pipeline
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/akagr/finance-tools/backtest/internal/engine"
 	"github.com/akagr/finance-tools/backtest/internal/metrics"
@@ -18,7 +19,7 @@ import (
 type Options struct {
 	PricesPath     string  // CSV file (columns: date,symbol,close)
 	Symbol         string  // which symbol in the CSV to test; "" = first found
-	Strategy       string  // sma-cross|ema-cross|momentum|rsi|donchian|buy-hold
+	Strategy       string  // one of the names below, or "all" to run every strategy
 	Fast           int     // fast MA window (sma-cross, ema-cross)
 	Slow           int     // slow MA window (sma-cross, ema-cross)
 	Lookback       int     // lookback window (momentum)
@@ -33,7 +34,14 @@ type Options struct {
 // smallSample is the point below which results are flagged as unreliable.
 const smallSample = 60
 
+// benchmarkName is the strategy every other is measured against.
+const benchmarkName = "buy-hold"
+
 // BuildReport runs the full offline backtest and returns a render-ready report.
+// When Options.Strategy is "all", every strategy is run and compared in one
+// table; otherwise the chosen strategy is shown against the buy-and-hold
+// benchmark. Lines are sorted by total return (best first), so where the
+// benchmark lands makes it obvious which strategies actually beat it.
 func BuildReport(opts Options) (report.Report, error) {
 	all, err := series.Load(opts.PricesPath)
 	if err != nil {
@@ -51,7 +59,7 @@ func BuildReport(opts Options) (report.Report, error) {
 		return report.Report{}, fmt.Errorf("pipeline: series %q has %d bars, need >=2", s.Label, len(s.Points))
 	}
 
-	strat, err := buildStrategy(opts)
+	strats, err := strategiesFor(opts)
 	if err != nil {
 		return report.Report{}, err
 	}
@@ -66,31 +74,35 @@ func BuildReport(opts Options) (report.Report, error) {
 	}
 	cfg := engine.Config{InitialCapital: capital, Costs: costs}
 
-	stratRes, err := engine.Run(s, strat, cfg)
-	if err != nil {
-		return report.Report{}, err
-	}
-	benchRes, err := engine.Run(s, strategy.BuyHold{}, cfg)
-	if err != nil {
-		return report.Report{}, err
+	var (
+		lines       []report.Line
+		firstDate   string
+		lastDate    string
+		benchReturn float64
+	)
+	for _, st := range strats {
+		res, err := engine.Run(s, st, cfg)
+		if err != nil {
+			return report.Report{}, err
+		}
+		stats := metrics.Compute(res.Dates, res.Equity, res.Weights, res.Trades, res.Turnover, res.TotalCost)
+		lines = append(lines, report.LineFrom(res.Strategy, stats))
+		if res.Strategy == benchmarkName {
+			benchReturn = stats.TotalReturn
+		}
+		firstDate, lastDate = res.Dates[0], res.Dates[len(res.Dates)-1]
 	}
 
-	stratStats := metrics.Compute(stratRes.Dates, stratRes.Equity, stratRes.Weights, stratRes.Trades, stratRes.Turnover, stratRes.TotalCost)
-	benchStats := metrics.Compute(benchRes.Dates, benchRes.Equity, benchRes.Weights, benchRes.Trades, benchRes.Turnover, benchRes.TotalCost)
+	// Best total return first; the benchmark falls into its natural rank.
+	sort.SliceStable(lines, func(i, j int) bool { return lines[i].TotalReturn > lines[j].TotalReturn })
 
-	var notes []string
-	if len(s.Points) < smallSample {
-		notes = append(notes, fmt.Sprintf("Small sample: only %d bars. Metrics are noisy; use a longer date range before trusting any edge.", len(s.Points)))
-	}
-	if stratStats.TotalReturn <= benchStats.TotalReturn {
-		notes = append(notes, "The strategy did not beat buy-and-hold after costs over this period — the expected outcome for most simple rules, and exactly why you backtest before deploying capital.")
-	}
+	notes := buildNotes(opts, len(s.Points), lines, benchReturn)
 
 	rep := report.Report{
 		Meta: report.Meta{
 			Symbol:         s.Label,
-			Start:          stratRes.Dates[0],
-			End:            stratRes.Dates[len(stratRes.Dates)-1],
+			Start:          firstDate,
+			End:            lastDate,
 			Bars:           len(s.Points),
 			InitialCapital: capital,
 			BrokerageBps:   costs.BrokerageBps,
@@ -98,12 +110,41 @@ func BuildReport(opts Options) (report.Report, error) {
 			SlippageBps:    costs.SlippageBps,
 			Notes:          notes,
 		},
-		Lines: []report.Line{
-			report.LineFrom(stratRes.Strategy, stratStats),
-			report.LineFrom(benchRes.Strategy, benchStats),
-		},
+		Lines: lines,
 	}
 	return rep, nil
+}
+
+// buildNotes assembles the review flags shown beneath the table.
+func buildNotes(opts Options, bars int, lines []report.Line, benchReturn float64) []string {
+	var notes []string
+	if bars < smallSample {
+		notes = append(notes, fmt.Sprintf("Small sample: only %d bars. Metrics are noisy; use a longer date range before trusting any edge.", bars))
+	}
+	if opts.Strategy == "all" {
+		beat := 0
+		total := 0
+		for _, l := range lines {
+			if l.Strategy == benchmarkName {
+				continue
+			}
+			total++
+			if l.TotalReturn > benchReturn {
+				beat++
+			}
+		}
+		notes = append(notes, fmt.Sprintf("%d of %d strategies beat buy-and-hold after costs over this period. Beating a benchmark on past data is not an edge — it is a hypothesis to validate out-of-sample before risking capital.", beat, total))
+		return notes
+	}
+	// Single-strategy mode: flag when the chosen rule (the non-benchmark line)
+	// failed to beat buy-and-hold.
+	for _, l := range lines {
+		if l.Strategy != benchmarkName && l.TotalReturn <= benchReturn {
+			notes = append(notes, "The strategy did not beat buy-and-hold after costs over this period — the expected outcome for most simple rules, and exactly why you backtest before deploying capital.")
+			break
+		}
+	}
+	return notes
 }
 
 func pick(all []series.Series, symbol string) (series.Series, error) {
@@ -122,6 +163,43 @@ func pick(all []series.Series, symbol string) (series.Series, error) {
 	return series.Series{}, fmt.Errorf("pipeline: symbol %q not found; available: %v", symbol, labels)
 }
 
+// strategiesFor returns the strategies to run for a given Options, always
+// including the buy-and-hold benchmark exactly once. For "all" it returns every
+// active strategy (built with the configured or default parameters) plus the
+// benchmark; otherwise the single chosen strategy plus the benchmark (or just
+// the benchmark if that is what was chosen).
+func strategiesFor(opts Options) ([]strategy.Strategy, error) {
+	if opts.Strategy == "all" {
+		out := make([]strategy.Strategy, 0, len(activeNames)+1)
+		for _, name := range activeNames {
+			st, err := buildStrategy(withStrategy(opts, name))
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, st)
+		}
+		return append(out, strategy.BuyHold{}), nil
+	}
+
+	st, err := buildStrategy(opts)
+	if err != nil {
+		return nil, err
+	}
+	if st.Name() == benchmarkName {
+		return []strategy.Strategy{st}, nil
+	}
+	return []strategy.Strategy{st, strategy.BuyHold{}}, nil
+}
+
+// activeNames lists the non-benchmark strategies, in display order, that "all"
+// runs. Keep in sync with buildStrategy.
+var activeNames = []string{"sma-cross", "ema-cross", "momentum", "rsi", "donchian"}
+
+func withStrategy(opts Options, name string) Options {
+	opts.Strategy = name
+	return opts
+}
+
 func buildStrategy(opts Options) (strategy.Strategy, error) {
 	switch opts.Strategy {
 	case "", "sma-cross":
@@ -137,7 +215,7 @@ func buildStrategy(opts Options) (strategy.Strategy, error) {
 	case "buy-hold":
 		return strategy.BuyHold{}, nil
 	default:
-		return nil, fmt.Errorf("pipeline: unknown strategy %q (want sma-cross|ema-cross|momentum|rsi|donchian|buy-hold)", opts.Strategy)
+		return nil, fmt.Errorf("pipeline: unknown strategy %q (want all|sma-cross|ema-cross|momentum|rsi|donchian|buy-hold)", opts.Strategy)
 	}
 }
 

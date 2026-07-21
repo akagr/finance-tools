@@ -6,8 +6,8 @@
 
 | Strategy     |  Total |   CAGR | Ann. vol | Sharpe | Max DD |      Final | Trades | Exposure |   Costs |
 | ------------ | -----: | -----: | -------: | -----: | -----: | ---------: | -----: | -------: | ------: |
-| momentum(20) |  5.46% | 12.49% |    6.42% |   1.79 |  4.80% | ₹105461.67 |      6 |   44.17% | ₹906.26 |
 | buy-hold     | 12.08% | 28.72% |    8.94% |   2.75 |  8.24% | ₹111913.70 |      1 |  100.00% | ₹149.78 |
+| momentum(20) |  5.46% | 12.49% |    6.42% |   1.79 |  4.80% | ₹105461.67 |      6 |   44.17% | ₹906.26 |
 
 > The strategy did not beat buy-and-hold after costs over this period — the expected outcome for most simple rules, and exactly why you backtest before deploying capital.
 

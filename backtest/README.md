@@ -23,6 +23,9 @@ go run ./cmd/backtest fetch prices --start 2019-01-01 --end 2024-12-31 > data/ni
 # 2. Backtest a 50/200 SMA crossover on the Nifty 50, vs buy-and-hold.
 go run ./cmd/backtest run --prices data/nifty.csv --symbol NIFTY50 \
   --strategy sma-cross --fast 50 --slow 200 --capital 10000
+
+# ...or run every strategy at once and compare them in one sorted table.
+go run ./cmd/backtest run --prices data/nifty.csv --symbol NIFTY50 --strategy all --capital 10000
 ```
 
 Expect most simple rules to **lose to buy-and-hold after costs** — discovering that cheaply is
@@ -31,7 +34,9 @@ the entire point.
 ## Strategies
 
 Every run pits the chosen strategy against a **buy-and-hold** benchmark. Each lives in its own
-file under `internal/strategy/`.
+file under `internal/strategy/`. Pass `--strategy all` to run **every** strategy at once and
+compare them in a single table sorted by total return (best first), with the benchmark ranked
+in so it is obvious which strategies actually beat it.
 
 | Name        | Style          | Rule                                                                   | Flags                          |
 |-------------|----------------|------------------------------------------------------------------------|--------------------------------|
@@ -59,7 +64,7 @@ backtest run --prices <csv> [flags]
 
   --prices         price CSV file (columns: date,symbol,close) (required)
   --symbol         which symbol in the CSV to test (default: first found)
-  --strategy       sma-cross | ema-cross | momentum | rsi | donchian | buy-hold (default sma-cross)
+  --strategy       all | sma-cross | ema-cross | momentum | rsi | donchian | buy-hold (default sma-cross)
   --fast           fast MA window, sma-cross/ema-cross (default 20)
   --slow           slow MA window, sma-cross/ema-cross (default 50)
   --lookback       lookback window in bars, momentum (default 120)

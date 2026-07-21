@@ -60,6 +60,7 @@ Usage:
   backtest version
 
 Strategies (each is run against a buy-and-hold benchmark):
+  all         run every strategy below and compare them in one table
   sma-cross   simple MA crossover      flags: --fast --slow
   ema-cross   exponential MA crossover flags: --fast --slow
   momentum    time-series momentum     flag:  --lookback
@@ -78,7 +79,7 @@ func cmdRun(args []string) int {
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
+		strat     = fs.String("strategy", "sma-cross", "strategy: all|sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
 		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
 		slow      = fs.Int("slow", 50, "slow MA window (sma-cross, ema-cross)")
 		lookback  = fs.Int("lookback", 120, "lookback window in bars (momentum)")

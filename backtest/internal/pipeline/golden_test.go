@@ -88,3 +88,16 @@ func TestGoldenStrategies(t *testing.T) {
 		checkGolden(t, c.golden, render(t, opts, "md"))
 	}
 }
+
+// Locks the multi-strategy comparison path: "all" runs every strategy plus the
+// benchmark into one sorted table.
+func TestGoldenAll(t *testing.T) {
+	opts := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		Strategy:       "all",
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+	}
+	checkGolden(t, "all.md", render(t, opts, "md"))
+	checkGolden(t, "all.json", render(t, opts, "json"))
+}

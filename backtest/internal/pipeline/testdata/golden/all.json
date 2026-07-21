@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "symbol": "SYNTH",
+    "start": "2023-01-02",
+    "end": "2023-06-16",
+    "bars": 120,
+    "initial_capital": 100000,
+    "brokerage_bps": 0,
+    "stt_bps": 10,
+    "slippage_bps": 5,
+    "notes": [
+      "1 of 5 strategies beat buy-and-hold after costs over this period. Beating a benchmark on past data is not an edge — it is a hypothesis to validate out-of-sample before risking capital."
+    ]
+  },
+  "lines": [
+    {
+      "strategy": "donchian(20/10)",
+      "total_return": 0.14478141124943456,
+      "cagr": 0.3489331068798025,
+      "ann_vol": 0.052357941920595744,
+      "sharpe": 5.497764414002744,
+      "max_drawdown": 0.018781184061660995,
+      "final_value": 114478.14112494345,
+      "trades": 4,
+      "turnover": 428961.6728477208,
+      "total_cost": 643.4425092715812,
+      "exposure": 0.3333333333333333
+    },
+    {
+      "strategy": "buy-hold",
+      "total_return": 0.12081572775624694,
+      "cagr": 0.28721396546333633,
+      "ann_vol": 0.08936977037308749,
+      "sharpe": 2.748152011489488,
+      "max_drawdown": 0.08241063233550508,
+      "final_value": 111913.7026,
+      "trades": 1,
+      "turnover": 99850,
+      "total_cost": 149.775,
+      "exposure": 1
+    },
+    {
+      "strategy": "ema-cross(20/50)",
+      "total_return": 0.005587360866109892,
+      "cagr": 0.012410337017588091,
+      "ann_vol": 0.0631291449716333,
+      "sharpe": 0.21816677540453047,
+      "max_drawdown": 0.07765421879569076,
+      "final_value": 100558.73608661098,
+      "trades": 1,
+      "turnover": 99850,
+      "total_cost": 149.775,
+      "exposure": 0.5916666666666667
+    },
+    {
+      "strategy": "momentum(120)",
+      "total_return": 0,
+      "cagr": 0,
+      "ann_vol": 0,
+      "sharpe": 0,
+      "max_drawdown": 0,
+      "final_value": 100000,
+      "trades": 0,
+      "turnover": 0,
+      "total_cost": 0,
+      "exposure": 0
+    },
+    {
+      "strategy": "rsi(14\u003c30)",
+      "total_return": -0.09388224032413706,
+      "cagr": -0.19606235035075936,
+      "ann_vol": 0.03758335488629679,
+      "sharpe": -5.53388551795209,
+      "max_drawdown": 0.0938822403241371,
+      "final_value": 90611.77596758629,
+      "trades": 5,
+      "turnover": 482467.2328370793,
+      "total_cost": 723.700849255619,
+      "exposure": 0.3333333333333333
+    },
+    {
+      "strategy": "sma-cross(20/50)",
+      "total_return": -0.11121897780578283,
+      "cagr": -0.22971711762271751,
+      "ann_vol": 0.04146763112382103,
+      "sharpe": -5.997499655101832,
+      "max_drawdown": 0.1225684336365594,
+      "final_value": 88878.10221942172,
+      "trades": 3,
+      "turnover": 289362.16010775015,
+      "total_cost": 434.04324016162525,
+      "exposure": 0.4583333333333333
+    }
+  ]
+}

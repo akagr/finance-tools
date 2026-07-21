@@ -6,8 +6,8 @@
 
 | Strategy   |   Total |    CAGR | Ann. vol | Sharpe | Max DD |      Final | Trades | Exposure |   Costs |
 | ---------- | ------: | ------: | -------: | -----: | -----: | ---------: | -----: | -------: | ------: |
-| rsi(14<45) | -10.34% | -21.47% |    4.75% |  -4.84 | 10.34% |  ₹89656.72 |      5 |   41.67% | ₹724.26 |
 | buy-hold   |  12.08% |  28.72% |    8.94% |   2.75 |  8.24% | ₹111913.70 |      1 |  100.00% | ₹149.78 |
+| rsi(14<45) | -10.34% | -21.47% |    4.75% |  -4.84 | 10.34% |  ₹89656.72 |      5 |   41.67% | ₹724.26 |
 
 > The strategy did not beat buy-and-hold after costs over this period — the expected outcome for most simple rules, and exactly why you backtest before deploying capital.
 
