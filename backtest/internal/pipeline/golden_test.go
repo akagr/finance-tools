@@ -117,3 +117,29 @@ func TestGoldenVolTarget(t *testing.T) {
 	}
 	checkGolden(t, "voltarget.md", render(t, opts, "md"))
 }
+
+// Locks the walk-forward render path across every format.
+func TestGoldenWalkForward(t *testing.T) {
+	opts := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		Strategy:       "sma-cross",
+		Fast:           3,
+		Slow:           8,
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+	}
+	wf, err := BuildWalkForward(opts, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderWF := func(format string) []byte {
+		var buf bytes.Buffer
+		if err := report.RenderWalkForward(&buf, wf, format); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+	checkGolden(t, "walkforward.md", renderWF("md"))
+	checkGolden(t, "walkforward.csv", renderWF("csv"))
+	checkGolden(t, "walkforward.json", renderWF("json"))
+}

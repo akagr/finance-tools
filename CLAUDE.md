@@ -17,8 +17,9 @@ in one `go.work` workspace:
   costs). Each strategy lives in its own file under `internal/strategy/` and is registered in
   `pipeline.buildStrategy`; `--strategy all` compares them in one table, `--sort` ranks it, and
   `--vol-target` adds a volatility-targeting position-sizing overlay (the benchmark stays
-  unscaled). A research tool: output is not advice, and a backtest is a hypothesis fit to the
-  past, not a forecast. See `backtest/README.md`.
+  unscaled). A `walkforward` command splits history into out-of-sample folds to check an edge is
+  consistent, not a lucky stretch. A research tool: output is not advice, and a backtest is a
+  hypothesis fit to the past, not a forecast. See `backtest/README.md`.
 
 ## Commands
 

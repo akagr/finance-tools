@@ -211,6 +211,51 @@ question about how much volatility you can stomach.
 - **The past is not the future.** A backtest assumes tomorrow's market behaves like the sample.
   Crashes, regime shifts and new regulations don't ask permission.
 
+## Walk-forward: is the edge real, or one lucky stretch?
+
+A single backtest over all history is the *most flattering* number a strategy will ever show. The
+antidote is **walk-forward analysis**: chop the timeline into consecutive **out-of-sample folds**
+and check the strategy in *each* sub-period separately. A real edge shows up again and again; a
+fake one comes from a single favourable regime and vanishes everywhere else.
+
+```sh
+# Split 10 years of Nifty into 5 two-year folds and test sma-cross in each.
+go run ./cmd/backtest walkforward --prices data/nifty.csv --symbol NIFTY50 \
+  --strategy sma-cross --folds 5
+```
+
+A real result:
+
+```
+| Fold | Period                  | Strategy | Buy & hold |    Edge | Sharpe | Max DD | Beat? |
+| 1    | 2015-01-02 → 2017-01-05 |   -6.57% |     -1.45% |  -5.12% |  -0.32 | 18.45% | no    |
+| 2    | 2017-01-05 → 2019-01-04 |   22.68% |     29.65% |  -6.98% |   1.19 | 10.48% | no    |
+| 3    | 2019-01-04 → 2021-01-05 |   75.70% |     32.37% |  43.33% |   2.37 |  8.32% | yes   |
+| 4    | 2021-01-05 → 2022-12-29 |    7.02% |     28.11% | -21.09% |   0.34 | 20.64% | no    |
+| 5    | 2022-12-29 → 2024-12-31 |   21.14% |     29.98% |  -8.84% |   0.99 |  8.62% | no    |
+```
+
+The lesson is stark: sma-cross beat buy-and-hold in **1 of 5 folds**. That one fold (2019–2021)
+contains the COVID crash, where the trend rule went to cash and dodged the fall — almost its
+*entire* apparent edge came from a single event. In every calm period it lost. A plain full-period
+backtest hides this; the fold view exposes it.
+
+How to read it:
+
+- **Edge** — strategy return minus buy-and-hold return for that fold. Positive = beat the
+  benchmark that period.
+- **Beat?** — did the strategy out-return buy-and-hold in that fold? You want **yes across most
+  folds**, not a single huge win dragging up the average.
+- The strategy runs *continuously* across the whole history (so its moving averages stay warmed
+  up); the folds only slice up the resulting equity curve for measurement.
+
+This does **not** re-tune parameters per fold yet (that is a later step) — it checks whether a
+*fixed* rule is consistent across time. Walk-forward with per-fold re-optimisation, parameter
+sweeps and regime analysis are the rest of Phase 2 on the roadmap.
+
+`walkforward` takes the same strategy and cost flags as `run`, plus `--folds N` (default 4). It
+needs a single non-benchmark strategy (not `all`).
+
 ## Usage
 
 ```
@@ -235,6 +280,9 @@ backtest run --prices <csv> [flags]
   --format         comma-separated: md,csv,json (default md)
   --sort           rank the table by: return | cagr | sharpe | sortino | calmar | drawdown (default return)
   --out            output directory (default: print to stdout)
+
+backtest walkforward --prices <csv> --strategy <name> [--folds N] [same strategy/cost flags as run]
+  --folds          number of consecutive out-of-sample folds (default 4)
 
 backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
 ```
@@ -292,9 +340,10 @@ band. Next:
 - Optional stop-loss / trailing-stop and a configurable rebalance calendar.
 
 **Phase 2 — Robustness & validation.** Stop fooling yourself. A single backtest is the *most*
-flattering number a strategy will ever show.
+flattering number a strategy will ever show. Delivered so far: **walk-forward** analysis
+(`walkforward` command) that tests a fixed rule across consecutive out-of-sample folds. Next:
 
-- **Walk-forward / out-of-sample** splits: fit parameters on one window, test on the next.
+- Walk-forward with per-fold **parameter re-optimisation** (fit on one window, test on the next).
 - **Parameter sweeps** with heatmaps to see whether an edge is a plateau (robust) or a spike
   (overfit), plus a note on multiple-testing / data-mining bias.
 - Monte-Carlo trade reshuffling and regime analysis (bull/bear/sideways, high/low vol).

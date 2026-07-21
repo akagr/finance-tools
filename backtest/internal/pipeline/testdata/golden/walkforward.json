@@ -1,0 +1,55 @@
+{
+  "meta": {
+    "symbol": "SYNTH",
+    "strategy": "sma-cross(3/8)",
+    "start": "2023-01-02",
+    "end": "2023-06-16",
+    "bars": 120,
+    "folds": 4,
+    "notes": [
+      "The strategy beat buy-and-hold in 3 of 4 out-of-sample folds. Consistency across folds is the signal to look for; an edge concentrated in one fold is usually luck or a single favourable regime, not a repeatable strategy."
+    ]
+  },
+  "folds": [
+    {
+      "index": 1,
+      "start": "2023-01-02",
+      "end": "2023-02-10",
+      "strategy_return": 0.004823679596988706,
+      "benchmark_return": -0.007028984161027152,
+      "strategy_sharpe": 1.460188574736563,
+      "strategy_max_drawdown": 0.008982824143114748,
+      "beat_benchmark": true
+    },
+    {
+      "index": 2,
+      "start": "2023-02-10",
+      "end": "2023-03-24",
+      "strategy_return": 0.1429135106976125,
+      "benchmark_return": 0.14692641468778578,
+      "strategy_sharpe": 17.490841531879703,
+      "strategy_max_drawdown": 0.003932258651240725,
+      "beat_benchmark": false
+    },
+    {
+      "index": 3,
+      "start": "2023-03-24",
+      "end": "2023-05-05",
+      "strategy_return": 0.06998698972466832,
+      "benchmark_return": 0.0030539116737948735,
+      "strategy_sharpe": 9.175971057916016,
+      "strategy_max_drawdown": 0.006196091597324829,
+      "beat_benchmark": true
+    },
+    {
+      "index": 4,
+      "start": "2023-05-05",
+      "end": "2023-06-16",
+      "strategy_return": 0.04986612364006682,
+      "benchmark_return": -0.01884456554295133,
+      "strategy_sharpe": 7.799626185878422,
+      "strategy_max_drawdown": 0.008295146081879763,
+      "beat_benchmark": true
+    }
+  ]
+}
