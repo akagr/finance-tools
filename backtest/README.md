@@ -111,6 +111,44 @@ NSE cash symbols use a `.NS` Yahoo suffix (e.g. `NIFTYBEES.NS`); indices are pre
 - **One asset, one series at a time.** No portfolios, shorting, leverage, intraday bars, or
   corporate-action adjustment yet. Use adjusted-close symbols where possible.
 
+## Roadmap
+
+This backtester is **Phase 1** of a deliberately staged path from idea to (maybe) live capital.
+Money is the *last* step, not the first: each phase must earn its way into the next, and most
+ideas should die in Phase 1 or 2 — cheaply, on a laptop, instead of expensively, in the market.
+
+**Phase 1 — Backtesting (here now).** Measure a rule's edge on history against a benchmark.
+Near-term improvements to this tool:
+
+- `--sort` to rank the comparison table by Sharpe, drawdown or CAGR, not just total return.
+- Risk-based **position sizing** (volatility targeting) instead of all-in/all-out weights.
+- Richer metrics: Sortino, Calmar, win rate, average holding period, rolling returns.
+- **Corporate-action-adjusted** closes and a `--benchmark` other than buy-and-hold.
+- Multi-asset **portfolios** (cross-sectional momentum, equal-risk weighting) and long/short.
+- Optional stop-loss / trailing-stop and a configurable rebalance calendar.
+
+**Phase 2 — Robustness & validation.** Stop fooling yourself. A single backtest is the *most*
+flattering number a strategy will ever show.
+
+- **Walk-forward / out-of-sample** splits: fit parameters on one window, test on the next.
+- **Parameter sweeps** with heatmaps to see whether an edge is a plateau (robust) or a spike
+  (overfit), plus a note on multiple-testing / data-mining bias.
+- Monte-Carlo trade reshuffling and regime analysis (bull/bear/sideways, high/low vol).
+- Sensitivity to costs and slippage — the edge must survive pessimistic assumptions.
+
+**Phase 3 — Paper trading (zero capital).** Wire the surviving strategy to a **live data feed**
+and place *simulated* orders for weeks. Validates data plumbing, latency, and real slippage
+before a single rupee is at risk. Use a free-API broker (Upstox / Dhan / Fyers) rather than a
+paid one. Likely a **new module** (e.g. `papertrade/`), not part of this offline tool.
+
+**Phase 4 — Live, bounded, tiny.** Only if an edge survives Phases 1–3. A rule-based bot *you*
+approve — never open-ended discretion — with hard risk limits (max position, daily loss stop,
+kill switch), full audit logging, and **SEBI algo registration/tagging** with the broker.
+Start with an amount you are entirely willing to lose.
+
+> Honest expectation: most strategies never make it past Phase 2. That is a *success* — the
+> whole point of this pipeline is to discover a lack of edge cheaply, not to reach live trading.
+
 ## Development
 
 ```sh

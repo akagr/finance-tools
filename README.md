@@ -26,6 +26,22 @@ finance-tools/
   …                  # future tools as sibling directories
 ```
 
+## Algorithmic-trading roadmap
+
+The **backtest** tool is Phase 1 of a deliberately staged path from idea to (maybe) live
+capital — money is the last step, not the first:
+
+1. **Backtesting** *(here now)* — measure a rule's edge on history vs a benchmark.
+2. **Robustness & validation** — walk-forward / out-of-sample tests, parameter sweeps, regime
+   and cost sensitivity, to stop a single flattering backtest fooling you.
+3. **Paper trading** *(zero capital)* — a live data feed with simulated orders for weeks;
+   likely a new `papertrade/` module.
+4. **Live, bounded, tiny** — only if an edge survives, as an approved rule-based bot with hard
+   risk limits and SEBI algo registration.
+
+Most ideas should die in steps 1–2 — cheaply, on a laptop. See
+[`backtest/README.md`](backtest/README.md#roadmap) for the detailed roadmap.
+
 ## Building
 
 Requires Go (not currently installed on this machine — `brew install go`).
