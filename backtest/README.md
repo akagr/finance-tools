@@ -249,12 +249,44 @@ How to read it:
 - The strategy runs *continuously* across the whole history (so its moving averages stay warmed
   up); the folds only slice up the resulting equity curve for measurement.
 
-This does **not** re-tune parameters per fold yet (that is a later step) — it checks whether a
-*fixed* rule is consistent across time. Walk-forward with per-fold re-optimisation and regime
-analysis are the rest of Phase 2 on the roadmap.
-
 `walkforward` takes the same strategy and cost flags as `run`, plus `--folds N` (default 4). It
 needs a single non-benchmark strategy (not `all`).
+
+### `--optimize`: the acid test (walk-forward optimisation)
+
+Plain `walkforward` tests a *fixed* rule across folds. The stronger version re-chooses the
+parameters on each fold's **training** data and tests them on the **next unseen** fold — the way
+you'd actually have to pick parameters live, with no knowledge of the future. Add `--optimize`:
+
+```sh
+go run ./cmd/backtest walkforward --prices data/nifty.csv --symbol NIFTY50 \
+  --strategy sma-cross --optimize --folds 5 --metric sharpe
+```
+
+Each fold sweeps the grid on all *prior* data, keeps the best parameters (by `--metric`), and
+reports how they did on the following period. A real result:
+
+```
+| Fold | Period                  | Params           | Strategy | Buy & hold |    Edge | Beat? |
+| 1    | 2016-09-06 → 2018-05-07 | fast=50 slow=180 |    7.44% |     19.82% | -12.38% | no    |
+| 2    | 2018-05-07 → 2020-01-10 | fast=20 slow=200 |   -1.25% |     14.38% | -15.64% | no    |
+| 3    | 2020-01-10 → 2021-09-03 | fast=20 slow=60  |   60.66% |     41.34% |  19.33% | yes   |
+| 4    | 2021-09-03 → 2023-05-03 | fast=20 slow=60  |  -13.16% |      4.42% | -17.58% | no    |
+| 5    | 2023-05-03 → 2024-12-31 | fast=10 slow=80  |   28.18% |     30.71% |  -2.53% | no    |
+```
+
+Two red flags leap out. First, the **best parameters jump around** every fold (50/180, then
+20/200, then 20/60, then 10/80) — a stable edge would keep landing near the same settings.
+Second, out-of-sample the strategy beat buy-and-hold in only **1 of 5 folds**. Verdict: on this
+data, sma-cross has **no robust, transferable edge** — the settings that won in training simply
+didn't carry forward. A plain full-period backtest, which looked competitive, hid all of this.
+
+That "failure" is the tool doing its job. Finding out here, for free, that a rule doesn't survive
+honest out-of-sample testing is *exactly* why you backtest before risking money.
+
+`--optimize` uses the same grid controls as `sweep` (`--param name:min:max:step`, up to twice, or
+a per-strategy default) and `--metric` to pick the winner. It needs `folds+1` segments of data
+(the first is the initial training window).
 
 ## Parameter sweeps: robust plateau, or overfit spike?
 
@@ -328,8 +360,10 @@ backtest run --prices <csv> [flags]
   --sort           rank the table by: return | cagr | sharpe | sortino | calmar | drawdown (default return)
   --out            output directory (default: print to stdout)
 
-backtest walkforward --prices <csv> --strategy <name> [--folds N] [same strategy/cost flags as run]
+backtest walkforward --prices <csv> --strategy <name> [--folds N] [--optimize] [same flags as run/sweep]
   --folds          number of consecutive out-of-sample folds (default 4)
+  --optimize       re-fit parameters on each training window before testing the next fold
+  --param/--metric with --optimize: grid to search and metric to pick the winner (as in sweep)
 
 backtest sweep --prices <csv> --strategy <name> [--param name:min:max:step ...] [same cost flags]
   --param          parameter to sweep as name:min:max:step (repeatable, up to 2; default per strategy)
@@ -392,13 +426,13 @@ band. Next:
 
 **Phase 2 — Robustness & validation.** Stop fooling yourself. A single backtest is the *most*
 flattering number a strategy will ever show. Delivered so far: **walk-forward** analysis
-(`walkforward`) that tests a fixed rule across consecutive out-of-sample folds, and **parameter
-sweeps** (`sweep`) that map the performance surface to tell a robust plateau from an overfit
-spike. Next:
+(`walkforward`), **parameter sweeps** (`sweep`) that map the performance surface, and
+**walk-forward optimisation** (`walkforward --optimize`) that re-fits parameters on each training
+window and tests them out-of-sample — the most honest estimate here of live performance. Next:
 
-- Walk-forward with per-fold **parameter re-optimisation** (fit on one window, test on the next).
 - Monte-Carlo trade reshuffling and regime analysis (bull/bear/sideways, high/low vol).
 - Sensitivity to costs and slippage — the edge must survive pessimistic assumptions.
+- Rolling (non-anchored) training windows as an option alongside the current anchored one.
 
 **Phase 3 — Paper trading (zero capital).** Wire the surviving strategy to a **live data feed**
 and place *simulated* orders for weeks. Validates data plumbing, latency, and real slippage

@@ -1,31 +1,23 @@
 {
   "meta": {
     "symbol": "SYNTH",
-    "strategy": "sma-cross(3/8)",
+    "strategy": "sma-cross",
     "start": "2023-01-02",
     "end": "2023-06-16",
     "bars": 120,
-    "folds": 4,
-    "optimised": false,
+    "folds": 3,
+    "optimised": true,
+    "metric": "sharpe",
     "notes": [
-      "The strategy beat buy-and-hold in 3 of 4 out-of-sample folds. Consistency across folds is the signal to look for; an edge concentrated in one fold is usually luck or a single favourable regime, not a repeatable strategy."
+      "Parameters were re-fit on prior data only and tested on the next unseen fold, so this is a genuine out-of-sample result: the strategy beat buy-and-hold in 2 of 3 folds. If the winning parameters keep changing wildly between folds, or the edge vanishes here despite looking good in a plain backtest, the rule was overfit."
     ]
   },
   "folds": [
     {
       "index": 1,
-      "start": "2023-01-02",
-      "end": "2023-02-10",
-      "strategy_return": 0.004823679596988706,
-      "benchmark_return": -0.007028984161027152,
-      "strategy_sharpe": 1.460188574736563,
-      "strategy_max_drawdown": 0.008982824143114748,
-      "beat_benchmark": true
-    },
-    {
-      "index": 2,
       "start": "2023-02-10",
       "end": "2023-03-24",
+      "params": "fast=3 slow=8",
       "strategy_return": 0.1429135106976125,
       "benchmark_return": 0.14692641468778578,
       "strategy_sharpe": 17.490841531879703,
@@ -33,9 +25,10 @@
       "beat_benchmark": false
     },
     {
-      "index": 3,
+      "index": 2,
       "start": "2023-03-24",
       "end": "2023-05-05",
+      "params": "fast=3 slow=8",
       "strategy_return": 0.06998698972466832,
       "benchmark_return": 0.0030539116737948735,
       "strategy_sharpe": 9.175971057916016,
@@ -43,9 +36,10 @@
       "beat_benchmark": true
     },
     {
-      "index": 4,
+      "index": 3,
       "start": "2023-05-05",
       "end": "2023-06-16",
+      "params": "fast=3 slow=8",
       "strategy_return": 0.04986612364006682,
       "benchmark_return": -0.01884456554295133,
       "strategy_sharpe": 7.799626185878422,

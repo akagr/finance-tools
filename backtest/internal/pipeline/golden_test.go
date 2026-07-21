@@ -144,6 +144,35 @@ func TestGoldenWalkForward(t *testing.T) {
 	checkGolden(t, "walkforward.json", renderWF("json"))
 }
 
+// Locks the walk-forward optimisation render path (Params column, optimised
+// header) across formats.
+func TestGoldenWalkForwardOpt(t *testing.T) {
+	opts := Options{
+		PricesPath:     filepath.Join(fixtures, "prices.csv"),
+		Strategy:       "sma-cross",
+		InitialCapital: 100000,
+		Costs:          engine.Costs{BrokerageBps: 0, STTBps: 10, SlippageBps: 5},
+	}
+	axes := []SweepAxis{
+		{Name: "fast", Min: 3, Max: 6, Step: 3},
+		{Name: "slow", Min: 8, Max: 12, Step: 4},
+	}
+	wf, err := BuildWalkForwardOpt(opts, axes, "sharpe", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderWFO := func(format string) []byte {
+		var buf bytes.Buffer
+		if err := report.RenderWalkForward(&buf, wf, format); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
+	checkGolden(t, "wfo.md", renderWFO("md"))
+	checkGolden(t, "wfo.csv", renderWFO("csv"))
+	checkGolden(t, "wfo.json", renderWFO("json"))
+}
+
 // Locks the parameter-sweep render path: a 2-D crossover grid (with invalid
 // cells) and a 1-D momentum sweep.
 func TestGoldenSweep(t *testing.T) {

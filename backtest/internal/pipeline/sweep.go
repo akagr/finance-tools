@@ -96,27 +96,16 @@ func BuildSweep(opts Options, axes []SweepAxis, metric string) (report.Sweep, er
 
 	combos := combinations(axisValues)
 	for _, coords := range combos {
-		runOpts := opts
-		for i, ax := range axes {
-			if runOpts, err = applyParam(runOpts, ax.Name, coords[i]); err != nil {
-				return report.Sweep{}, err
-			}
-		}
-		strat, err := buildStrategy(runOpts)
+		st, valid, err := runCombo(s, opts, axes, coords, cfg)
 		if err != nil {
+			return report.Sweep{}, err
+		}
+		if !valid {
 			// Invalid combination (e.g. fast >= slow): record it as a gap so the
 			// grid stays rectangular rather than aborting the whole sweep.
 			points = append(points, report.SweepPoint{Coords: append([]float64(nil), coords...), Valid: false})
 			continue
 		}
-		if strat, err = maybeVolTarget(strat, runOpts); err != nil {
-			return report.Sweep{}, err
-		}
-		res, err := engine.Run(s, strat, cfg)
-		if err != nil {
-			return report.Sweep{}, err
-		}
-		st := metrics.Compute(res.Dates, res.Equity, res.Weights, res.Trades, res.Turnover, res.TotalCost)
 		mv := getMetric(st)
 		points = append(points, report.SweepPoint{
 			Coords: append([]float64(nil), coords...), Valid: true,
@@ -195,6 +184,32 @@ func combinations(axisValues [][]float64) [][]float64 {
 		result = next
 	}
 	return result
+}
+
+// runCombo applies the coords to opts, builds the strategy (with any vol-target
+// overlay) and runs it over s, returning its stats. valid is false — with a nil
+// error — when the parameter combination is rejected by the strategy (e.g. a
+// crossover with fast >= slow), so callers can skip it without aborting.
+func runCombo(s series.Series, opts Options, axes []SweepAxis, coords []float64, cfg engine.Config) (metrics.Stats, bool, error) {
+	runOpts := opts
+	for i, ax := range axes {
+		var err error
+		if runOpts, err = applyParam(runOpts, ax.Name, coords[i]); err != nil {
+			return metrics.Stats{}, false, err
+		}
+	}
+	strat, err := buildStrategy(runOpts)
+	if err != nil {
+		return metrics.Stats{}, false, nil
+	}
+	if strat, err = maybeVolTarget(strat, runOpts); err != nil {
+		return metrics.Stats{}, false, err
+	}
+	res, err := engine.Run(s, strat, cfg)
+	if err != nil {
+		return metrics.Stats{}, false, err
+	}
+	return metrics.Compute(res.Dates, res.Equity, res.Weights, res.Trades, res.Turnover, res.TotalCost), true, nil
 }
 
 // applyParam sets the named parameter on a copy of opts.

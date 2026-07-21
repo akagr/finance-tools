@@ -17,10 +17,10 @@ in one `go.work` workspace:
   costs). Each strategy lives in its own file under `internal/strategy/` and is registered in
   `pipeline.buildStrategy`; `--strategy all` compares them in one table, `--sort` ranks it, and
   `--vol-target` adds a volatility-targeting position-sizing overlay (the benchmark stays
-  unscaled). A `walkforward` command splits history into out-of-sample folds, and a `sweep`
-  command maps the metric surface over a 1-D/2-D parameter grid (plateau vs overfit spike). A
-  research tool: output is not advice, and a backtest is a hypothesis fit to the past, not a
-  forecast. See `backtest/README.md`.
+  unscaled). A `walkforward` command splits history into out-of-sample folds (with `--optimize`
+  re-fitting parameters per fold), and a `sweep` command maps the metric surface over a 1-D/2-D
+  parameter grid (plateau vs overfit spike). A research tool: output is not advice, and a
+  backtest is a hypothesis fit to the past, not a forecast. See `backtest/README.md`.
 
 ## Commands
 

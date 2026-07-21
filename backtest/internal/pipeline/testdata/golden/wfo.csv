@@ -1,0 +1,4 @@
+fold,start,end,params,strategy_return,benchmark_return,edge,strategy_sharpe,strategy_max_drawdown,beat_benchmark
+1,2023-02-10,2023-03-24,fast=3 slow=8,0.1429,0.1469,-0.0040,17.4908,0.0039,false
+2,2023-03-24,2023-05-05,fast=3 slow=8,0.0700,0.0031,0.0669,9.1760,0.0062,true
+3,2023-05-05,2023-06-16,fast=3 slow=8,0.0499,-0.0188,0.0687,7.7996,0.0083,true

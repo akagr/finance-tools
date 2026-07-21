@@ -176,11 +176,15 @@ func cmdRun(args []string) int {
 
 func cmdWalkForward(args []string) int {
 	fs := flag.NewFlagSet("walkforward", flag.ExitOnError)
+	var params multiFlag
+	fs.Var(&params, "param", "with --optimize: parameter to re-fit as name:min:max:step (repeatable, up to 2)")
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
 		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian")
 		folds     = fs.Int("folds", 4, "number of consecutive out-of-sample folds")
+		optimize  = fs.Bool("optimize", false, "re-fit parameters on each training window before testing the next fold")
+		metric    = fs.String("metric", "sharpe", "with --optimize: metric to select parameters by (return|cagr|sharpe|sortino|calmar|drawdown)")
 		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
 		slow      = fs.Int("slow", 50, "slow MA window (sma-cross, ema-cross)")
 		lookback  = fs.Int("lookback", 120, "lookback window in bars (momentum)")
@@ -221,7 +225,31 @@ func cmdWalkForward(args []string) int {
 		VolTarget:      *volTarget / 100,
 		VolLookback:    *volLook,
 	}
-	wf, err := pipeline.BuildWalkForward(opts, *folds)
+
+	var wf report.WalkForward
+	var err error
+	if *optimize {
+		var axes []pipeline.SweepAxis
+		if len(params) == 0 {
+			axes = defaultSweepAxes(*strat)
+			if axes == nil {
+				fmt.Fprintf(os.Stderr, "error: no default sweep for strategy %q; pass --param name:min:max:step\n", *strat)
+				return 2
+			}
+		} else {
+			for _, spec := range params {
+				ax, perr := parseParamSpec(spec)
+				if perr != nil {
+					fmt.Fprintln(os.Stderr, "error:", perr)
+					return 2
+				}
+				axes = append(axes, ax)
+			}
+		}
+		wf, err = pipeline.BuildWalkForwardOpt(opts, axes, *metric, *folds)
+	} else {
+		wf, err = pipeline.BuildWalkForward(opts, *folds)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		return 1
