@@ -93,3 +93,44 @@ func TestUnknownStrategyErrors(t *testing.T) {
 		t.Fatal("expected error for unknown strategy")
 	}
 }
+
+func TestSortByDrawdownRanksLowestFirst(t *testing.T) {
+	opts := baseOpts()
+	opts.Strategy = "all"
+	opts.SortBy = "drawdown"
+	rep, err := BuildReport(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// drawdown is "lower is better", so the table must be ascending by Max DD.
+	for i := 1; i < len(rep.Lines); i++ {
+		if rep.Lines[i-1].MaxDrawdown > rep.Lines[i].MaxDrawdown {
+			t.Errorf("not ascending by drawdown at %d: %v > %v",
+				i, rep.Lines[i-1].MaxDrawdown, rep.Lines[i].MaxDrawdown)
+		}
+	}
+}
+
+func TestSortBySharpeRanksHighestFirst(t *testing.T) {
+	opts := baseOpts()
+	opts.Strategy = "all"
+	opts.SortBy = "sharpe"
+	rep, err := BuildReport(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i < len(rep.Lines); i++ {
+		if rep.Lines[i-1].Sharpe < rep.Lines[i].Sharpe {
+			t.Errorf("not descending by Sharpe at %d: %v < %v",
+				i, rep.Lines[i-1].Sharpe, rep.Lines[i].Sharpe)
+		}
+	}
+}
+
+func TestUnknownSortKeyErrors(t *testing.T) {
+	opts := baseOpts()
+	opts.SortBy = "bogus"
+	if _, err := BuildReport(opts); err == nil {
+		t.Fatal("expected error for unknown --sort key")
+	}
+}

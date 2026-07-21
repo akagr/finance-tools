@@ -23,7 +23,9 @@ type Stats struct {
 	CAGR         float64 // annualised compound growth over the calendar span
 	AnnVol       float64 // annualised stdev of daily returns
 	Sharpe       float64 // AnnReturn/AnnVol proxy: mean daily / stdev daily * sqrt(252)
+	Sortino      float64 // like Sharpe but penalising only downside deviation
 	MaxDrawdown  float64 // worst peak-to-trough decline, as a positive fraction
+	Calmar       float64 // CAGR / MaxDrawdown: return per unit of worst-case pain
 	Trades       int
 	Turnover     float64 // total traded notional
 	TotalCost    float64 // total costs paid
@@ -65,6 +67,9 @@ func Compute(dates []string, equity, weights []float64, trades int, turnover, to
 	if sd > 0 {
 		st.Sharpe = mean / sd * math.Sqrt(tradingDaysPerYear)
 	}
+	if dd := downsideDeviation(rets); dd > 0 {
+		st.Sortino = mean / dd * math.Sqrt(tradingDaysPerYear)
+	}
 
 	// CAGR over the actual calendar span.
 	if years := spanYears(dates[0], dates[n-1]); years > 0 && equity[n-1] > 0 {
@@ -72,6 +77,9 @@ func Compute(dates []string, equity, weights []float64, trades int, turnover, to
 	}
 
 	st.MaxDrawdown = maxDrawdown(equity)
+	if st.MaxDrawdown > 0 {
+		st.Calmar = st.CAGR / st.MaxDrawdown
+	}
 
 	if len(weights) == n {
 		held := 0
@@ -103,6 +111,23 @@ func meanStdev(xs []float64) (mean, sd float64) {
 		ss += d * d
 	}
 	return mean, math.Sqrt(ss / float64(len(xs)-1))
+}
+
+// downsideDeviation is the root-mean-square of the negative returns only, using
+// a zero minimum-acceptable-return. It is the denominator of the Sortino ratio:
+// unlike standard deviation, it ignores upside volatility (which no investor
+// wants to be penalised for) and measures only harmful, below-target moves.
+func downsideDeviation(xs []float64) float64 {
+	if len(xs) == 0 {
+		return 0
+	}
+	var ss float64
+	for _, x := range xs {
+		if x < 0 {
+			ss += x * x
+		}
+	}
+	return math.Sqrt(ss / float64(len(xs)))
 }
 
 func maxDrawdown(equity []float64) float64 {

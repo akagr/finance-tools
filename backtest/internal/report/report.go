@@ -33,7 +33,9 @@ type Line struct {
 	CAGR        float64 `json:"cagr"`
 	AnnVol      float64 `json:"ann_vol"`
 	Sharpe      float64 `json:"sharpe"`
+	Sortino     float64 `json:"sortino"`
 	MaxDrawdown float64 `json:"max_drawdown"`
+	Calmar      float64 `json:"calmar"`
 	FinalValue  float64 `json:"final_value"`
 	Trades      int     `json:"trades"`
 	Turnover    float64 `json:"turnover"`
@@ -49,7 +51,9 @@ func LineFrom(name string, s metrics.Stats) Line {
 		CAGR:        s.CAGR,
 		AnnVol:      s.AnnVol,
 		Sharpe:      s.Sharpe,
+		Sortino:     s.Sortino,
 		MaxDrawdown: s.MaxDrawdown,
+		Calmar:      s.Calmar,
 		FinalValue:  s.FinalValue,
 		Trades:      s.Trades,
 		Turnover:    s.Turnover,
@@ -90,13 +94,13 @@ func renderMarkdown(w io.Writer, rep Report) error {
 	fmt.Fprintf(&b, "- Costs: brokerage %.0f bps, STT %.0f bps, slippage %.0f bps (per trade)\n\n",
 		m.BrokerageBps, m.STTBps, m.SlippageBps)
 
-	header := []string{"Strategy", "Total", "CAGR", "Ann. vol", "Sharpe", "Max DD", "Final", "Trades", "Exposure", "Costs"}
-	aligns := []mdAlign{alignLeft, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight}
+	header := []string{"Strategy", "Total", "CAGR", "Ann. vol", "Sharpe", "Sortino", "Max DD", "Calmar", "Final", "Trades", "Exposure", "Costs"}
+	aligns := []mdAlign{alignLeft, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight, alignRight}
 	rows := make([][]string, 0, len(rep.Lines))
 	for _, l := range rep.Lines {
 		rows = append(rows, []string{
-			l.Strategy, pct(l.TotalReturn), pct(l.CAGR), pct(l.AnnVol), num(l.Sharpe),
-			pct(l.MaxDrawdown), money(l.FinalValue), strconv.Itoa(l.Trades), pct(l.Exposure), money(l.TotalCost),
+			l.Strategy, pct(l.TotalReturn), pct(l.CAGR), pct(l.AnnVol), num(l.Sharpe), num(l.Sortino),
+			pct(l.MaxDrawdown), num(l.Calmar), money(l.FinalValue), strconv.Itoa(l.Trades), pct(l.Exposure), money(l.TotalCost),
 		})
 	}
 	mdTable(&b, header, rows, aligns)
@@ -198,14 +202,14 @@ func pad(s string, w int, a mdAlign) string {
 func renderCSV(w io.Writer, rep Report) error {
 	cw := csv.NewWriter(w)
 	rows := [][]string{{
-		"strategy", "total_return", "cagr", "ann_vol", "sharpe",
-		"max_drawdown", "final_value", "trades", "turnover", "total_cost", "exposure",
+		"strategy", "total_return", "cagr", "ann_vol", "sharpe", "sortino",
+		"max_drawdown", "calmar", "final_value", "trades", "turnover", "total_cost", "exposure",
 	}}
 	for _, l := range rep.Lines {
 		rows = append(rows, []string{
 			l.Strategy,
-			f(l.TotalReturn), f(l.CAGR), f(l.AnnVol), f(l.Sharpe),
-			f(l.MaxDrawdown), f(l.FinalValue), strconv.Itoa(l.Trades),
+			f(l.TotalReturn), f(l.CAGR), f(l.AnnVol), f(l.Sharpe), f(l.Sortino),
+			f(l.MaxDrawdown), f(l.Calmar), f(l.FinalValue), strconv.Itoa(l.Trades),
 			f(l.Turnover), f(l.TotalCost), f(l.Exposure),
 		})
 	}

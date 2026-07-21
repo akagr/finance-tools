@@ -77,6 +77,7 @@ backtest run --prices <csv> [flags]
   --stt-bps        securities transaction tax per trade, basis points (default 10)
   --slippage-bps   assumed slippage per trade, basis points (default 5)
   --format         comma-separated: md,csv,json (default md)
+  --sort           rank the table by: return | cagr | sharpe | sortino | calmar | drawdown (default return)
   --out            output directory (default: print to stdout)
 
 backtest fetch prices --start <YYYY-MM-DD> --end <YYYY-MM-DD> [--tickers <file>]
@@ -104,8 +105,11 @@ NSE cash symbols use a `.NS` Yahoo suffix (e.g. `NIFTYBEES.NS`); indices are pre
   points. Defaults approximate NSE cash-delivery friction and are deliberately conservative —
   underestimating costs is how backtests lie. A no-trade band (1 bp of equity) stops a
   constant-weight rule from churning to unwind its own fee drag.
-- **Metrics**: total return, CAGR (over the actual calendar span), annualised volatility and
-  Sharpe (252 trading days, zero risk-free rate), max drawdown, trades, turnover and exposure.
+- **Metrics**: total return, CAGR (over the actual calendar span), annualised volatility,
+  Sharpe and **Sortino** (252 trading days, zero risk-free rate; Sortino penalises only downside
+  deviation), max drawdown and **Calmar** (CAGR ÷ max drawdown), plus trades, turnover and
+  exposure. Rank the comparison table by any of these with `--sort` — e.g. `--sort sharpe` often
+  promotes a lower-return but smoother strategy above buy-and-hold.
 - **Money is `float64`**, not `math/big.Rat` — like the sibling `correlation` module, this is
   statistics rather than tax accounting, where a paisa of rounding is immaterial.
 - **One asset, one series at a time.** No portfolios, shorting, leverage, intraday bars, or
@@ -118,11 +122,11 @@ Money is the *last* step, not the first: each phase must earn its way into the n
 ideas should die in Phase 1 or 2 — cheaply, on a laptop, instead of expensively, in the market.
 
 **Phase 1 — Backtesting (here now).** Measure a rule's edge on history against a benchmark.
-Near-term improvements to this tool:
+Delivered so far: multiple strategies with a one-shot `--strategy all` comparison, risk-adjusted
+metrics (Sharpe, Sortino, Calmar) and a `--sort` to rank the table by any of them. Next:
 
-- `--sort` to rank the comparison table by Sharpe, drawdown or CAGR, not just total return.
 - Risk-based **position sizing** (volatility targeting) instead of all-in/all-out weights.
-- Richer metrics: Sortino, Calmar, win rate, average holding period, rolling returns.
+- Further metrics: win rate, average holding period, rolling returns.
 - **Corporate-action-adjusted** closes and a `--benchmark` other than buy-and-hold.
 - Multi-asset **portfolios** (cross-sectional momentum, equal-risk weighting) and long/short.
 - Optional stop-loss / trailing-stop and a configurable rebalance calendar.

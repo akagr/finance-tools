@@ -4,10 +4,10 @@
 - Initial capital: ₹100000.00
 - Costs: brokerage 0 bps, STT 10 bps, slippage 5 bps (per trade)
 
-| Strategy   |   Total |    CAGR | Ann. vol | Sharpe | Max DD |      Final | Trades | Exposure |   Costs |
-| ---------- | ------: | ------: | -------: | -----: | -----: | ---------: | -----: | -------: | ------: |
-| buy-hold   |  12.08% |  28.72% |    8.94% |   2.75 |  8.24% | ₹111913.70 |      1 |  100.00% | ₹149.78 |
-| rsi(14<45) | -10.34% | -21.47% |    4.75% |  -4.84 | 10.34% |  ₹89656.72 |      5 |   41.67% | ₹724.26 |
+| Strategy   |   Total |    CAGR | Ann. vol | Sharpe | Sortino | Max DD | Calmar |      Final | Trades | Exposure |   Costs |
+| ---------- | ------: | ------: | -------: | -----: | ------: | -----: | -----: | ---------: | -----: | -------: | ------: |
+| buy-hold   |  12.08% |  28.72% |    8.94% |   2.75 |    4.81 |  8.24% |   3.49 | ₹111913.70 |      1 |  100.00% | ₹149.78 |
+| rsi(14<45) | -10.34% | -21.47% |    4.75% |  -4.84 |   -5.33 | 10.34% |  -2.08 |  ₹89656.72 |      5 |   41.67% | ₹724.26 |
 
 > The strategy did not beat buy-and-hold after costs over this period — the expected outcome for most simple rules, and exactly why you backtest before deploying capital.
 

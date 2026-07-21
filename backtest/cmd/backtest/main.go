@@ -92,6 +92,7 @@ func cmdRun(args []string) int {
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
 		slipBps   = fs.Float64("slippage-bps", 5, "assumed slippage per trade, basis points")
 		format    = fs.String("format", "md", "comma-separated output formats: md,csv,json")
+		sortBy    = fs.String("sort", "return", "rank the table by: return|cagr|sharpe|sortino|calmar|drawdown")
 		out       = fs.String("out", "", "output directory (default: print to stdout)")
 	)
 	if err := fs.Parse(args); err != nil {
@@ -115,6 +116,7 @@ func cmdRun(args []string) int {
 		DonchianExit:   *exit,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
+		SortBy:         *sortBy,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

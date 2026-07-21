@@ -29,6 +29,7 @@ type Options struct {
 	DonchianExit   int     // breakdown exit window (donchian)
 	InitialCapital float64 // starting cash; defaults to 100000 if <= 0
 	Costs          engine.Costs
+	SortBy         string // metric to rank the table by; "" = return (see sortKeys)
 }
 
 // smallSample is the point below which results are flagged as unreliable.
@@ -93,8 +94,11 @@ func BuildReport(opts Options) (report.Report, error) {
 		firstDate, lastDate = res.Dates[0], res.Dates[len(res.Dates)-1]
 	}
 
-	// Best total return first; the benchmark falls into its natural rank.
-	sort.SliceStable(lines, func(i, j int) bool { return lines[i].TotalReturn > lines[j].TotalReturn })
+	// Rank the table best-first by the chosen metric; the benchmark falls into
+	// its natural rank, making it obvious which strategies beat it.
+	if err := sortLines(lines, opts.SortBy); err != nil {
+		return report.Report{}, err
+	}
 
 	notes := buildNotes(opts, len(s.Points), lines, benchReturn)
 
@@ -145,6 +149,54 @@ func buildNotes(opts Options, bars int, lines []report.Line, benchReturn float64
 		}
 	}
 	return notes
+}
+
+// sortKey extracts the metric a line is ranked by; lowerIsBetter marks metrics
+// (drawdown) where a smaller value ranks higher.
+type sortKey struct {
+	get           func(report.Line) float64
+	lowerIsBetter bool
+}
+
+// sortKeys maps --sort values to how the comparison table is ordered. "return"
+// is the default. For every key the table is rendered best-first.
+var sortKeys = map[string]sortKey{
+	"return":   {get: func(l report.Line) float64 { return l.TotalReturn }},
+	"cagr":     {get: func(l report.Line) float64 { return l.CAGR }},
+	"sharpe":   {get: func(l report.Line) float64 { return l.Sharpe }},
+	"sortino":  {get: func(l report.Line) float64 { return l.Sortino }},
+	"calmar":   {get: func(l report.Line) float64 { return l.Calmar }},
+	"drawdown": {get: func(l report.Line) float64 { return l.MaxDrawdown }, lowerIsBetter: true},
+}
+
+// SortKeyNames returns the accepted --sort values, sorted, for help text and
+// validation messages.
+func SortKeyNames() []string {
+	names := make([]string, 0, len(sortKeys))
+	for k := range sortKeys {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// sortLines ranks lines best-first by the named metric (default "return").
+func sortLines(lines []report.Line, by string) error {
+	if by == "" {
+		by = "return"
+	}
+	key, ok := sortKeys[by]
+	if !ok {
+		return fmt.Errorf("pipeline: unknown --sort %q (want one of %v)", by, SortKeyNames())
+	}
+	sort.SliceStable(lines, func(i, j int) bool {
+		a, b := key.get(lines[i]), key.get(lines[j])
+		if key.lowerIsBetter {
+			return a < b
+		}
+		return a > b
+	})
+	return nil
 }
 
 func pick(all []series.Series, symbol string) (series.Series, error) {
