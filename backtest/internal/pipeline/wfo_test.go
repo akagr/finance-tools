@@ -34,23 +34,23 @@ func wfoOpts() Options {
 func TestWalkForwardOptValidation(t *testing.T) {
 	axes := []SweepAxis{{Name: "fast", Min: 3, Max: 6, Step: 3}, {Name: "slow", Min: 8, Max: 12, Step: 4}}
 
-	if _, err := BuildWalkForwardOpt(wfoOpts(), axes, "sharpe", 1); err == nil {
+	if _, err := BuildWalkForwardOpt(wfoOpts(), axes, "sharpe", 1, false); err == nil {
 		t.Error("expected error for < 2 folds")
 	}
-	if _, err := BuildWalkForwardOpt(sweepOpts("all"), axes, "sharpe", 3); err == nil {
+	if _, err := BuildWalkForwardOpt(sweepOpts("all"), axes, "sharpe", 3, false); err == nil {
 		t.Error("expected error for --strategy all")
 	}
-	if _, err := BuildWalkForwardOpt(wfoOpts(), nil, "sharpe", 3); err == nil {
+	if _, err := BuildWalkForwardOpt(wfoOpts(), nil, "sharpe", 3, false); err == nil {
 		t.Error("expected error for zero axes")
 	}
-	if _, err := BuildWalkForwardOpt(wfoOpts(), axes, "bogus", 3); err == nil {
+	if _, err := BuildWalkForwardOpt(wfoOpts(), axes, "bogus", 3, false); err == nil {
 		t.Error("expected error for unknown metric")
 	}
 }
 
 func TestWalkForwardOptProducesOptimisedFolds(t *testing.T) {
 	axes := []SweepAxis{{Name: "fast", Min: 3, Max: 6, Step: 3}, {Name: "slow", Min: 8, Max: 12, Step: 4}}
-	wf, err := BuildWalkForwardOpt(wfoOpts(), axes, "sharpe", 3)
+	wf, err := BuildWalkForwardOpt(wfoOpts(), axes, "sharpe", 3, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,12 +77,33 @@ func TestWalkForwardOptProducesOptimisedFolds(t *testing.T) {
 	}
 }
 
+func TestWalkForwardOptRollingSetsMeta(t *testing.T) {
+	axes := []SweepAxis{{Name: "fast", Min: 3, Max: 6, Step: 3}, {Name: "slow", Min: 8, Max: 12, Step: 4}}
+	anchored, err := BuildWalkForwardOpt(wfoOpts(), axes, "sharpe", 3, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if anchored.Meta.Rolling {
+		t.Error("anchored run should have Rolling=false")
+	}
+	rolling, err := BuildWalkForwardOpt(wfoOpts(), axes, "sharpe", 3, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rolling.Meta.Rolling {
+		t.Error("rolling run should have Rolling=true")
+	}
+	if len(rolling.Folds) != 3 {
+		t.Fatalf("rolling folds = %d, want 3", len(rolling.Folds))
+	}
+}
+
 func TestWalkForwardOptTooFewBars(t *testing.T) {
 	axes := []SweepAxis{{Name: "lookback", Min: 3, Max: 6, Step: 3}}
 	opts := baseOpts()
 	opts.Strategy = "momentum"
 	// 120-bar fixture, 100 folds needs >= 2*(101) bars.
-	if _, err := BuildWalkForwardOpt(opts, axes, "sharpe", 100); err == nil {
+	if _, err := BuildWalkForwardOpt(opts, axes, "sharpe", 100, false); err == nil {
 		t.Error("expected error when bars < 2*(folds+1)")
 	}
 }

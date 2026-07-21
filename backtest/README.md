@@ -288,6 +288,11 @@ honest out-of-sample testing is *exactly* why you backtest before risking money.
 a per-strategy default) and `--metric` to pick the winner. It needs `folds+1` segments of data
 (the first is the initial training window).
 
+By default the training window is **anchored** (expanding — each fold trains on *all* prior data).
+Add `--rolling` to train on a fixed-length **trailing** window instead, so a strategy adapts to
+recent conditions and distant history can't dominate the fit. Comparing anchored vs rolling is
+itself informative: if the edge only appears under one, it's fragile.
+
 ## Parameter sweeps: robust plateau, or overfit spike?
 
 Every strategy has knobs (`--fast`, `--slow`, `--lookback`, …). It is dangerously easy to try
@@ -379,6 +384,7 @@ backtest run --prices <csv> [flags]
 backtest walkforward --prices <csv> --strategy <name> [--folds N] [--optimize] [same flags as run/sweep]
   --folds          number of consecutive out-of-sample folds (default 4)
   --optimize       re-fit parameters on each training window before testing the next fold
+  --rolling        with --optimize: train on a fixed trailing window instead of all prior data
   --param/--metric with --optimize: grid to search and metric to pick the winner (as in sweep)
 
 backtest sweep --prices <csv> --strategy <name> [--param name:min:max:step ...] [same cost flags]
@@ -449,7 +455,6 @@ flattering number a strategy will ever show. Delivered so far: **walk-forward** 
 out-of-sample — the most honest estimate here of live performance. Next:
 
 - Monte-Carlo trade reshuffling and regime analysis (bull/bear/sideways, high/low vol).
-- Rolling (non-anchored) training windows as an option alongside the current anchored one.
 
 **Phase 3 — Paper trading (zero capital).** Wire the surviving strategy to a **live data feed**
 and place *simulated* orders for weeks. Validates data plumbing, latency, and real slippage

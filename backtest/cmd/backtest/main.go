@@ -184,6 +184,7 @@ func cmdWalkForward(args []string) int {
 		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian")
 		folds     = fs.Int("folds", 4, "number of consecutive out-of-sample folds")
 		optimize  = fs.Bool("optimize", false, "re-fit parameters on each training window before testing the next fold")
+		rolling   = fs.Bool("rolling", false, "with --optimize: train on a fixed trailing window instead of all prior data")
 		metric    = fs.String("metric", "sharpe", "with --optimize: metric to select parameters by (return|cagr|sharpe|sortino|calmar|drawdown)")
 		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
 		slow      = fs.Int("slow", 50, "slow MA window (sma-cross, ema-cross)")
@@ -246,7 +247,7 @@ func cmdWalkForward(args []string) int {
 				axes = append(axes, ax)
 			}
 		}
-		wf, err = pipeline.BuildWalkForwardOpt(opts, axes, *metric, *folds)
+		wf, err = pipeline.BuildWalkForwardOpt(opts, axes, *metric, *folds, *rolling)
 	} else {
 		wf, err = pipeline.BuildWalkForward(opts, *folds)
 	}

@@ -24,7 +24,7 @@ import (
 // This is the acid test: a rule that looks good only because its parameters were
 // chosen with hindsight will fall apart here, whereas one whose best training
 // parameters keep working out-of-sample has a far more credible edge.
-func BuildWalkForwardOpt(opts Options, axes []SweepAxis, metric string, folds int) (report.WalkForward, error) {
+func BuildWalkForwardOpt(opts Options, axes []SweepAxis, metric string, folds int, rolling bool) (report.WalkForward, error) {
 	if folds < 2 {
 		return report.WalkForward{}, fmt.Errorf("pipeline: walk-forward needs >= 2 folds, got %d", folds)
 	}
@@ -93,11 +93,20 @@ func BuildWalkForwardOpt(opts Options, axes []SweepAxis, metric string, folds in
 	}
 
 	bounds := foldBounds(n, folds+1) // folds+1 segments → indices 0..folds+1
+	trainLen := bounds[1]            // one segment's worth of bars (bounds[0] == 0)
 	wfFolds := make([]report.Fold, 0, folds)
 	beat := 0
 	for j := 1; j <= folds; j++ {
 		aTest, bTest := bounds[j], bounds[j+1]
-		train := series.Series{Label: s.Label, Points: s.Points[:aTest+1]}
+		// Anchored: train on all prior data. Rolling: train on a fixed-length
+		// trailing window, so distant history can't dominate the fit.
+		trainStart := 0
+		if rolling {
+			if ts := aTest - trainLen; ts > 0 {
+				trainStart = ts
+			}
+		}
+		train := series.Series{Label: s.Label, Points: s.Points[trainStart : aTest+1]}
 
 		bestCoords, found, err := optimiseOnSeries(train, opts, axes, combos, cfg, getMetric, lowerIsBetter)
 		if err != nil {
@@ -146,9 +155,13 @@ func BuildWalkForwardOpt(opts Options, axes []SweepAxis, metric string, folds in
 		})
 	}
 
+	window := "anchored (all prior data)"
+	if rolling {
+		window = fmt.Sprintf("rolling (~%d-bar trailing window)", trainLen)
+	}
 	notes := []string{fmt.Sprintf(
-		"Parameters were re-fit on prior data only and tested on the next unseen fold, so this is a genuine out-of-sample result: the strategy beat buy-and-hold in %d of %d folds. If the winning parameters keep changing wildly between folds, or the edge vanishes here despite looking good in a plain backtest, the rule was overfit.",
-		beat, folds)}
+		"Parameters were re-fit on prior data only (%s) and tested on the next unseen fold, so this is a genuine out-of-sample result: the strategy beat buy-and-hold in %d of %d folds. If the winning parameters keep changing wildly between folds, or the edge vanishes here despite looking good in a plain backtest, the rule was overfit.",
+		window, beat, folds)}
 
 	return report.WalkForward{
 		Meta: report.WFMeta{
@@ -159,6 +172,7 @@ func BuildWalkForwardOpt(opts Options, axes []SweepAxis, metric string, folds in
 			Bars:      n,
 			Folds:     folds,
 			Optimised: true,
+			Rolling:   rolling,
 			Metric:    metric,
 			Notes:     notes,
 		},

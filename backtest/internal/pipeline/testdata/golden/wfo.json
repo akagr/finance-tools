@@ -9,7 +9,7 @@
     "optimised": true,
     "metric": "sharpe",
     "notes": [
-      "Parameters were re-fit on prior data only and tested on the next unseen fold, so this is a genuine out-of-sample result: the strategy beat buy-and-hold in 2 of 3 folds. If the winning parameters keep changing wildly between folds, or the edge vanishes here despite looking good in a plain backtest, the rule was overfit."
+      "Parameters were re-fit on prior data only (anchored (all prior data)) and tested on the next unseen fold, so this is a genuine out-of-sample result: the strategy beat buy-and-hold in 2 of 3 folds. If the winning parameters keep changing wildly between folds, or the edge vanishes here despite looking good in a plain backtest, the rule was overfit."
     ]
   },
   "folds": [

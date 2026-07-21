@@ -18,6 +18,7 @@ type WFMeta struct {
 	Bars      int      `json:"bars"`
 	Folds     int      `json:"folds"`
 	Optimised bool     `json:"optimised"`
+	Rolling   bool     `json:"rolling,omitempty"`
 	Metric    string   `json:"metric,omitempty"`
 	Notes     []string `json:"notes,omitempty"`
 }
@@ -71,6 +72,11 @@ func renderWFMarkdown(w io.Writer, wf WalkForward) error {
 	fmt.Fprintf(&b, "- Out-of-sample folds: %d\n", m.Folds)
 	if m.Optimised {
 		fmt.Fprintf(&b, "- Parameters re-fit each fold on prior data, chosen by **%s**\n", m.Metric)
+		window := "anchored (expanding)"
+		if m.Rolling {
+			window = "rolling (fixed trailing window)"
+		}
+		fmt.Fprintf(&b, "- Training window: %s\n", window)
 	}
 	b.WriteByte('\n')
 

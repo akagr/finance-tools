@@ -157,7 +157,7 @@ func TestGoldenWalkForwardOpt(t *testing.T) {
 		{Name: "fast", Min: 3, Max: 6, Step: 3},
 		{Name: "slow", Min: 8, Max: 12, Step: 4},
 	}
-	wf, err := BuildWalkForwardOpt(opts, axes, "sharpe", 3)
+	wf, err := BuildWalkForwardOpt(opts, axes, "sharpe", 3, false)
 	if err != nil {
 		t.Fatal(err)
 	}
