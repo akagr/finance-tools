@@ -15,8 +15,8 @@ tied together by a root `go.work` workspace.
 |-----------------|--------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | **schedule-fa** | [`schedule-fa/`](schedule-fa/) | complete (M0–M7) | Generates a ready-to-use **Schedule FA** (Foreign Assets) report for the Indian ITR from **Interactive Brokers (IBKR)** holdings. |
 | **correlation** | [`correlation/`](correlation/) | in progress      | Computes return **correlations** across assets (e.g. VWRA vs Nifty 50) to assess how diversified a portfolio really is.           |
-| **backtest**    | [`backtest/`](backtest/)       | in progress      | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs). Research only — not advice. |
-| **papertrade**  | [`papertrade/`](papertrade/)   | in progress      | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account) to validate it before risking capital. No real orders — not advice. |
+| **backtest**    | [`backtest/`](backtest/)       | complete         | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs), with walk-forward, parameter sweeps, Monte-Carlo and regime robustness tests. Research only — not advice. |
+| **papertrade**  | [`papertrade/`](papertrade/)   | complete         | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account, equity curve, performance vs benchmark) to validate it before risking capital. No real orders — not advice. |
 
 ## Layout
 
