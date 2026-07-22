@@ -63,6 +63,7 @@ papertrade status --dir <dir>
 papertrade summary --dir <dir>
 papertrade history --dir <dir>
 papertrade list --root <dir>
+papertrade export --dir <dir> [--what equity|fills]
 papertrade version
 ```
 
@@ -82,6 +83,8 @@ papertrade version
 - **list** — a one-line overview of every account under a `--root` directory (strategy, symbol,
   last bar, current equity, return, fills). Handy when running several paper strategies at once;
   reads stored state only, no network.
+- **export** — dump the `equity` curve or the `fills` log as CSV to stdout (`--what`), for
+  plotting or analysis in your tool of choice.
 
 Each account is a directory holding `account.json` (state), `fills.jsonl` (every trade) and
 `equity.jsonl` (a daily marked-to-market snapshot). **Keep account directories out of version

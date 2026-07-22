@@ -37,8 +37,9 @@ capital — money is the last step, not the first:
 2. **Robustness & validation** *(done)* — walk-forward folds, parameter sweeps, walk-forward
    optimisation (re-fit parameters out-of-sample), Monte-Carlo bootstrap and regime analysis all
    stress-test an edge from different angles.
-3. **Paper trading** *(in progress)* — the `papertrade/` module runs a strategy forward on live
-   data with simulated fills and a persistent account, to validate it over weeks at zero capital.
+3. **Paper trading** *(built)* — the `papertrade/` module runs a strategy forward on live data
+   with simulated fills, a persistent account, a daily equity curve and performance-vs-benchmark
+   reporting, to validate it over weeks at zero capital.
 4. **Live, bounded, tiny** — only if an edge survives, as an approved rule-based bot with hard
    risk limits and SEBI algo registration.
 

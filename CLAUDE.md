@@ -28,7 +28,8 @@ in one `go.work` workspace:
   `init`, `step` (act on the newest unprocessed daily bar; idempotent per bar; records a daily
   marked-to-market equity snapshot even with no trade), `status` (marked to market), `summary`
   (performance over the tracked period vs a buy-and-hold benchmark, via `internal/perf`),
-  `history`. Reuses copies of backtest's `strategy` and `yahoo` packages (kept in sync manually,
+  `history`, `list` (multi-account overview under a `--root`), and `export` (equity/fills to CSV).
+  Reuses copies of backtest's `strategy` and `yahoo` packages (kept in sync manually,
   per the isolated-module convention); a `broker.PaperBroker` mirrors the backtest cost model and
   buys are capped to available cash. Places **no real orders**. See `papertrade/README.md`.
 

@@ -9,11 +9,13 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/akagr/finance-tools/papertrade/internal/account"
@@ -50,6 +52,8 @@ func main() {
 		os.Exit(cmdHistory(os.Args[2:]))
 	case "list", "ls":
 		os.Exit(cmdList(os.Args[2:]))
+	case "export":
+		os.Exit(cmdExport(os.Args[2:]))
 	case "version":
 		fmt.Println("papertrade " + version)
 	case "-h", "--help", "help":
@@ -71,6 +75,7 @@ Usage:
   papertrade summary --dir <dir>
   papertrade history --dir <dir>
   papertrade list --root <dir>
+  papertrade export --dir <dir> [--what equity|fills]
   papertrade version
 
 Run "papertrade init -h" or "papertrade step -h" for flags.
@@ -391,6 +396,62 @@ func orNone(s string) string {
 	}
 	return s
 }
+
+func cmdExport(args []string) int {
+	fs := flag.NewFlagSet("export", flag.ExitOnError)
+	var (
+		dir  = fs.String("dir", "", "account directory")
+		what = fs.String("what", "equity", "what to export: equity | fills")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *dir == "" {
+		fmt.Fprintln(os.Stderr, "error: --dir is required")
+		return 2
+	}
+	st := store.New(*dir)
+	if _, err := st.Load(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	cw := csv.NewWriter(os.Stdout)
+	defer cw.Flush()
+
+	switch *what {
+	case "equity":
+		snaps, err := st.ReadEquity()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		cw.Write([]string{"date", "quote", "cash", "shares", "equity", "weight"})
+		for _, s := range snaps {
+			cw.Write([]string{s.Date, f(s.Quote), f(s.Cash), f(s.Shares), f(s.Equity), f(s.Weight)})
+		}
+	case "fills":
+		fills, err := st.ReadLog()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			return 1
+		}
+		cw.Write([]string{"date", "side", "shares", "price", "cost", "cash_after", "shares_after", "equity_after"})
+		for _, e := range fills {
+			cw.Write([]string{e.Date, string(e.Fill.Side), f(e.Fill.Shares), f(e.Fill.Price), f(e.Fill.Cost), f(e.CashAfter), f(e.SharesAfter), f(e.EquityAfter)})
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "error: --what must be equity or fills, got %q\n", *what)
+		return 2
+	}
+	if err := cw.Error(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	return 0
+}
+
+// f formats a float for CSV output.
+func f(v float64) string { return strconv.FormatFloat(v, 'f', 4, 64) }
 
 // accountSummary is one line of the multi-account overview.
 type accountSummary struct {

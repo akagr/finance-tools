@@ -540,15 +540,18 @@ angle:
 The recurring verdict on these toy strategies over Nifty: **no robust, transferable edge** — which
 is Phase 2 doing its job, cheaply, before any capital is at risk.
 
-**Phase 3 — Paper trading (zero capital).** Wire the surviving strategy to a **live data feed**
-and place *simulated* orders for weeks. Validates data plumbing, latency, and real slippage
-before a single rupee is at risk. Use a free-API broker (Upstox / Dhan / Fyers) rather than a
-paid one. Likely a **new module** (e.g. `papertrade/`), not part of this offline tool.
+**Phase 3 — Paper trading (zero capital)** *(built — see [`../papertrade`](../papertrade))*. The
+`papertrade/` module wires a strategy to a **live (daily) data feed** and places *simulated*
+orders forward in time, with a persistent account, a daily equity curve, performance-vs-benchmark
+`summary`, and a multi-account `list`. Run `step` once a trading day (by hand or cron) for weeks
+to validate data plumbing, costs and live behaviour before any rupee is at risk. Intraday/latency
+and a real broker API remain a Phase-4 concern.
 
 **Phase 4 — Live, bounded, tiny.** Only if an edge survives Phases 1–3. A rule-based bot *you*
 approve — never open-ended discretion — with hard risk limits (max position, daily loss stop,
 kill switch), full audit logging, and **SEBI algo registration/tagging** with the broker.
-Start with an amount you are entirely willing to lose.
+Start with an amount you are entirely willing to lose. The paper broker in `papertrade` is the
+seam a real (free-API: Upstox / Dhan / Fyers) broker would slot into.
 
 > Honest expectation: most strategies never make it past Phase 2. That is a *success* — the
 > whole point of this pipeline is to discover a lack of edge cheaply, not to reach live trading.
