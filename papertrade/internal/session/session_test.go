@@ -148,6 +148,37 @@ func TestStepBuyNeverGoesNegativeCash(t *testing.T) {
 	}
 }
 
+func TestStepLogsEquityEvenWithoutTrade(t *testing.T) {
+	// A strategy that stays flat (slow window longer than history) never trades,
+	// but each processed bar must still record an equity snapshot.
+	a := newAccount()
+	a.Strategy = account.StrategyConfig{Name: "sma-cross", Fast: 2, Slow: 100}
+	st := store.New(t.TempDir())
+	b := bars(10, 11, 12, 13, 14)
+	res, err := Step(a, b, false, st, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Traded {
+		t.Fatal("expected no trade for a never-invested strategy")
+	}
+	snaps, err := st.ReadEquity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snaps) != 1 {
+		t.Fatalf("equity snapshots = %d, want 1", len(snaps))
+	}
+	if snaps[0].Equity != 100000 || snaps[0].Date != b[len(b)-1].Date {
+		t.Errorf("unexpected snapshot %+v", snaps[0])
+	}
+	// Fills log stays empty.
+	fills, _ := st.ReadLog()
+	if len(fills) != 0 {
+		t.Errorf("expected no fills, got %d", len(fills))
+	}
+}
+
 func TestStepRejectsTooFewBars(t *testing.T) {
 	a := newAccount()
 	if _, err := Step(a, bars(10), false, nil, time.Now()); err == nil {

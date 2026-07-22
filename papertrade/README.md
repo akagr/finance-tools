@@ -41,7 +41,10 @@ go run ./cmd/papertrade step --dir ./accounts/nifty-sma
 # 3. See where the account stands (marked to the latest live quote).
 go run ./cmd/papertrade status --dir ./accounts/nifty-sma
 
-# 4. Review every simulated fill.
+# 4. After it's run for a while, review performance vs buy-and-hold.
+go run ./cmd/papertrade summary --dir ./accounts/nifty-sma
+
+# 5. Review every simulated fill.
 go run ./cmd/papertrade history --dir ./accounts/nifty-sma
 ```
 
@@ -57,6 +60,7 @@ To run it forward automatically, add a weekday cron entry, e.g.:
 papertrade init  --dir <dir> --symbol <label> --yahoo <sym> [--strategy <name>] [strategy flags] [--capital N]
 papertrade step  --dir <dir> [--force]
 papertrade status --dir <dir>
+papertrade summary --dir <dir>
 papertrade history --dir <dir>
 papertrade version
 ```
@@ -66,13 +70,18 @@ papertrade version
   match the backtester (`--strategy`, `--fast/--slow`, `--lookback`, `--rsi-period/-threshold`,
   `--entry/--exit`, `--vol-target/-lookback`, `--brokerage-bps/--stt-bps/--slippage-bps`).
 - **step** — fetch the latest data and act on the newest unprocessed bar. `--force` re-acts on a
-  bar already processed (useful for testing).
+  bar already processed (useful for testing). Every processed bar records a marked-to-market
+  equity snapshot, so the equity curve is complete even on days with no trade.
 - **status** — cash, position, average cost, realised P&L, and — when a live quote is available —
-  marked-to-market equity, unrealised P&L and total return.
+  marked-to-market equity, unrealised P&L and total return *right now*.
+- **summary** — performance over the whole tracked period from the equity log: total return,
+  CAGR, annualised vol, Sharpe and max drawdown, next to a **buy-and-hold benchmark** over the
+  same dates and the edge against it. Needs at least two days of history.
 - **history** — the full fills log (date, side, shares, price, cost, equity after).
 
-Each account is a directory holding `account.json` (state) and `fills.jsonl` (the audit log).
-**Keep account directories out of version control** — they are your data, not code.
+Each account is a directory holding `account.json` (state), `fills.jsonl` (every trade) and
+`equity.jsonl` (a daily marked-to-market snapshot). **Keep account directories out of version
+control** — they are your data, not code.
 
 ## Relationship to `backtest`
 

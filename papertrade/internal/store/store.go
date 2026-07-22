@@ -27,6 +27,18 @@ type LogEntry struct {
 	EquityAfter float64     `json:"equity_after"`
 }
 
+// EquitySnapshot is the marked-to-market state after processing one bar, logged
+// on every step (trade or not) so the paper equity curve is complete.
+type EquitySnapshot struct {
+	Date   string    `json:"date"`
+	Time   time.Time `json:"time"`
+	Quote  float64   `json:"quote"`
+	Cash   float64   `json:"cash"`
+	Shares float64   `json:"shares"`
+	Equity float64   `json:"equity"`
+	Weight float64   `json:"weight"`
+}
+
 // Store reads and writes an account and its fills log under a directory.
 type Store struct {
 	Dir string
@@ -35,8 +47,9 @@ type Store struct {
 // New returns a Store rooted at dir.
 func New(dir string) *Store { return &Store{Dir: dir} }
 
-func (s *Store) statePath() string { return filepath.Join(s.Dir, "account.json") }
-func (s *Store) logPath() string   { return filepath.Join(s.Dir, "fills.jsonl") }
+func (s *Store) statePath() string  { return filepath.Join(s.Dir, "account.json") }
+func (s *Store) logPath() string    { return filepath.Join(s.Dir, "fills.jsonl") }
+func (s *Store) equityPath() string { return filepath.Join(s.Dir, "equity.jsonl") }
 
 // Exists reports whether an account has been initialised in the directory.
 func (s *Store) Exists() bool {
@@ -76,17 +89,54 @@ func (s *Store) Load() (*account.Account, error) {
 	return &a, nil
 }
 
-// AppendLog appends one fill entry to the JSON-lines log.
+// AppendLog appends one fill entry to the fills JSON-lines log.
 func (s *Store) AppendLog(e LogEntry) error {
+	return s.appendJSONL(s.logPath(), e)
+}
+
+// ReadLog returns all recorded fill entries in order.
+func (s *Store) ReadLog() ([]LogEntry, error) {
+	var out []LogEntry
+	err := s.readJSONL(s.logPath(), func(line []byte) error {
+		var e LogEntry
+		if err := json.Unmarshal(line, &e); err != nil {
+			return err
+		}
+		out = append(out, e)
+		return nil
+	})
+	return out, err
+}
+
+// AppendEquity appends one marked-to-market snapshot to the equity log.
+func (s *Store) AppendEquity(e EquitySnapshot) error {
+	return s.appendJSONL(s.equityPath(), e)
+}
+
+// ReadEquity returns all recorded equity snapshots in order.
+func (s *Store) ReadEquity() ([]EquitySnapshot, error) {
+	var out []EquitySnapshot
+	err := s.readJSONL(s.equityPath(), func(line []byte) error {
+		var e EquitySnapshot
+		if err := json.Unmarshal(line, &e); err != nil {
+			return err
+		}
+		out = append(out, e)
+		return nil
+	})
+	return out, err
+}
+
+func (s *Store) appendJSONL(path string, v any) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(s.logPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	data, err := json.Marshal(e)
+	data, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -94,17 +144,15 @@ func (s *Store) AppendLog(e LogEntry) error {
 	return err
 }
 
-// ReadLog returns all recorded fill entries in order.
-func (s *Store) ReadLog() ([]LogEntry, error) {
-	f, err := os.Open(s.logPath())
+func (s *Store) readJSONL(path string, fn func([]byte) error) error {
+	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil
 		}
-		return nil, err
+		return err
 	}
 	defer f.Close()
-	var out []LogEntry
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for sc.Scan() {
@@ -112,11 +160,9 @@ func (s *Store) ReadLog() ([]LogEntry, error) {
 		if len(line) == 0 {
 			continue
 		}
-		var e LogEntry
-		if err := json.Unmarshal(line, &e); err != nil {
-			return nil, fmt.Errorf("store: parsing log line: %w", err)
+		if err := fn(line); err != nil {
+			return fmt.Errorf("store: parsing %s: %w", path, err)
 		}
-		out = append(out, e)
 	}
-	return out, sc.Err()
+	return sc.Err()
 }

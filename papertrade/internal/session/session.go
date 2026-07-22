@@ -77,59 +77,67 @@ func Step(a *account.Account, bars []Bar, force bool, st *store.Store, now time.
 
 	res := StepResult{Date: latest.Date, Quote: price, TargetWt: target, PriorWt: priorWt}
 
-	if math.Abs(delta*price) <= minTradeFraction*equity {
-		// Within the no-trade band: just advance the processed-bar marker.
-		a.LastBarDate = latest.Date
-		a.UpdatedAt = now
-		res.EquityAfter = a.Portfolio.Equity(price)
-		return res, nil
-	}
-
-	br := broker.New(a.Costs)
-	var fill broker.Fill
-	if delta > 0 {
-		// Affordability cap: buying pays slippage and fees on top of the notional,
-		// so a 100% target can't spend 100% of cash. Limit the buy to what cash
-		// covers net of those frictions, leaving the account non-negative.
-		slip := br.Costs.SlippageBps / 10000.0
-		feeFrac := (br.Costs.BrokerageBps + br.Costs.STTBps) / 10000.0
-		perShare := price * (1 + slip) * (1 + feeFrac)
-		if perShare > 0 {
-			if maxAffordable := a.Portfolio.Cash / perShare; delta > maxAffordable {
-				delta = maxAffordable
+	var fill *broker.Fill
+	if math.Abs(delta*price) > minTradeFraction*equity {
+		br := broker.New(a.Costs)
+		if delta > 0 {
+			// Affordability cap: buying pays slippage and fees on top of the
+			// notional, so a 100% target can't spend 100% of cash. Limit the buy
+			// to what cash covers net of those frictions, keeping cash >= 0.
+			slip := br.Costs.SlippageBps / 10000.0
+			feeFrac := (br.Costs.BrokerageBps + br.Costs.STTBps) / 10000.0
+			perShare := price * (1 + slip) * (1 + feeFrac)
+			if perShare > 0 {
+				if maxAffordable := a.Portfolio.Cash / perShare; delta > maxAffordable {
+					delta = maxAffordable
+				}
 			}
+			if delta > 0 {
+				f := br.Execute(broker.Buy, delta, price)
+				a.Portfolio.Buy(f.Shares, f.Price, f.Cost)
+				fill = &f
+			}
+		} else {
+			f := br.Execute(broker.Sell, -delta, price)
+			a.Portfolio.Sell(f.Shares, f.Price, f.Cost)
+			fill = &f
 		}
-		if delta <= 0 {
-			a.LastBarDate = latest.Date
-			a.UpdatedAt = now
-			res.EquityAfter = a.Portfolio.Equity(price)
-			return res, nil
-		}
-		fill = br.Execute(broker.Buy, delta, price)
-		a.Portfolio.Buy(fill.Shares, fill.Price, fill.Cost)
-	} else {
-		fill = br.Execute(broker.Sell, -delta, price)
-		a.Portfolio.Sell(fill.Shares, fill.Price, fill.Cost)
 	}
 
+	// Finalise: advance the processed-bar marker and record state, whether or not
+	// a trade happened, so the equity curve is complete.
 	a.LastBarDate = latest.Date
 	a.UpdatedAt = now
 	equityAfter := a.Portfolio.Equity(price)
-
-	res.Traded = true
-	res.Fill = &fill
 	res.EquityAfter = equityAfter
+	if fill != nil {
+		res.Traded = true
+		res.Fill = fill
+	}
 
 	if st != nil {
-		if err := st.AppendLog(store.LogEntry{
-			Date:        latest.Date,
-			Time:        now,
-			Fill:        fill,
-			Quote:       price,
-			TargetWt:    target,
-			CashAfter:   a.Portfolio.Cash,
-			SharesAfter: a.Portfolio.Shares,
-			EquityAfter: equityAfter,
+		if fill != nil {
+			if err := st.AppendLog(store.LogEntry{
+				Date:        latest.Date,
+				Time:        now,
+				Fill:        *fill,
+				Quote:       price,
+				TargetWt:    target,
+				CashAfter:   a.Portfolio.Cash,
+				SharesAfter: a.Portfolio.Shares,
+				EquityAfter: equityAfter,
+			}); err != nil {
+				return res, err
+			}
+		}
+		if err := st.AppendEquity(store.EquitySnapshot{
+			Date:   latest.Date,
+			Time:   now,
+			Quote:  price,
+			Cash:   a.Portfolio.Cash,
+			Shares: a.Portfolio.Shares,
+			Equity: equityAfter,
+			Weight: a.Portfolio.Weight(price),
 		}); err != nil {
 			return res, err
 		}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/akagr/finance-tools/papertrade/internal/account"
 	"github.com/akagr/finance-tools/papertrade/internal/broker"
+	"github.com/akagr/finance-tools/papertrade/internal/perf"
 	"github.com/akagr/finance-tools/papertrade/internal/portfolio"
 	"github.com/akagr/finance-tools/papertrade/internal/session"
 	"github.com/akagr/finance-tools/papertrade/internal/store"
@@ -41,6 +42,8 @@ func main() {
 		os.Exit(cmdStep(os.Args[2:]))
 	case "status":
 		os.Exit(cmdStatus(os.Args[2:]))
+	case "summary":
+		os.Exit(cmdSummary(os.Args[2:]))
 	case "history":
 		os.Exit(cmdHistory(os.Args[2:]))
 	case "version":
@@ -61,6 +64,7 @@ Usage:
   papertrade init  --dir <dir> --symbol <label> --yahoo <sym> [--strategy <name>] [strategy flags]
   papertrade step  --dir <dir> [--force]
   papertrade status --dir <dir>
+  papertrade summary --dir <dir>
   papertrade history --dir <dir>
   papertrade version
 
@@ -297,6 +301,51 @@ func latestQuote(symbol string) (float64, bool) {
 		return 0, false
 	}
 	return bars[len(bars)-1].Close, true
+}
+
+func cmdSummary(args []string) int {
+	fs := flag.NewFlagSet("summary", flag.ExitOnError)
+	dir := fs.String("dir", "", "account directory")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *dir == "" {
+		fmt.Fprintln(os.Stderr, "error: --dir is required")
+		return 2
+	}
+	st := store.New(*dir)
+	a, err := st.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	snaps, err := st.ReadEquity()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	su, ok := perf.Summarize(snaps)
+	if !ok {
+		fmt.Printf("Not enough history yet for %s: run `step` on at least two distinct trading days.\n", a.Name)
+		return 0
+	}
+
+	edge := su.TotalReturn - su.BenchReturn
+	fmt.Printf("Paper performance: %s (%s on %s)\n", a.Name, a.Strategy.Name, a.Symbol)
+	fmt.Printf("  Period            : %s → %s (%d daily snapshots)\n", su.Start, su.End, su.Snapshots)
+	fmt.Printf("  Equity            : ₹%.2f → ₹%.2f\n", su.StartEquity, su.EndEquity)
+	fmt.Printf("  Total return      : %.2f%%\n", su.TotalReturn*100)
+	fmt.Printf("  CAGR              : %.2f%%\n", su.CAGR*100)
+	fmt.Printf("  Annualised vol    : %.2f%%\n", su.AnnVol*100)
+	fmt.Printf("  Sharpe            : %.2f\n", su.Sharpe)
+	fmt.Printf("  Max drawdown      : %.2f%%\n", su.MaxDrawdown*100)
+	fmt.Println()
+	fmt.Printf("  Buy & hold return : %.2f%% (max drawdown %.2f%%)\n", su.BenchReturn*100, su.BenchMaxDD*100)
+	fmt.Printf("  Edge vs buy & hold: %+.2f%%\n", edge*100)
+	fmt.Println()
+	fmt.Println("Tracking starts at the first `step`, so early numbers are noisy — let it run for weeks.")
+	fmt.Println(disclaimer)
+	return 0
 }
 
 func cmdHistory(args []string) int {

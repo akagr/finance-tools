@@ -69,3 +69,25 @@ func TestLoadMissingErrors(t *testing.T) {
 		t.Error("expected error loading a missing account")
 	}
 }
+
+func TestAppendAndReadEquity(t *testing.T) {
+	st := New(t.TempDir())
+	for i := 0; i < 3; i++ {
+		if err := st.AppendEquity(EquitySnapshot{
+			Date:   "2024-01-0" + string(rune('1'+i)),
+			Equity: float64(100000 + i*1000),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snaps, err := st.ReadEquity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snaps) != 3 {
+		t.Fatalf("snapshots = %d, want 3", len(snaps))
+	}
+	if snaps[2].Equity != 102000 {
+		t.Errorf("last equity = %v, want 102000", snaps[2].Equity)
+	}
+}
