@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [schedule-fa, correlation, backtest]
+        module: [schedule-fa, correlation, backtest, papertrade]
     defaults:
       run:
         working-directory: ${{ matrix.module }}

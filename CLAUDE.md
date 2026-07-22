@@ -23,6 +23,12 @@ in one `go.work` workspace:
   gauge how much of a result is luck, and a `regime` command splits performance by market state
   (bull/bear, high/low vol). A research tool: output is not advice, and a backtest is a hypothesis
   fit to the past, not a forecast. See `backtest/README.md`.
+- **`papertrade/`** — runs a strategy **forward** on live Yahoo data with **simulated** fills and
+  a persistent account (`account.json` + `fills.jsonl` under a `--dir`). Commands: `init`, `step`
+  (act on the newest unprocessed daily bar; idempotent per bar), `status` (marked to market),
+  `history`. Reuses copies of backtest's `strategy` and `yahoo` packages (kept in sync manually,
+  per the isolated-module convention); a `broker.PaperBroker` mirrors the backtest cost model and
+  buys are capped to available cash. Places **no real orders**. See `papertrade/README.md`.
 
 ## Commands
 

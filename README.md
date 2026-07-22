@@ -16,6 +16,7 @@ tied together by a root `go.work` workspace.
 | **schedule-fa** | [`schedule-fa/`](schedule-fa/) | complete (M0–M7) | Generates a ready-to-use **Schedule FA** (Foreign Assets) report for the Indian ITR from **Interactive Brokers (IBKR)** holdings. |
 | **correlation** | [`correlation/`](correlation/) | in progress      | Computes return **correlations** across assets (e.g. VWRA vs Nifty 50) to assess how diversified a portfolio really is.           |
 | **backtest**    | [`backtest/`](backtest/)       | in progress      | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs). Research only — not advice. |
+| **papertrade**  | [`papertrade/`](papertrade/)   | in progress      | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account) to validate it before risking capital. No real orders — not advice. |
 
 ## Layout
 
@@ -36,8 +37,8 @@ capital — money is the last step, not the first:
 2. **Robustness & validation** *(done)* — walk-forward folds, parameter sweeps, walk-forward
    optimisation (re-fit parameters out-of-sample), Monte-Carlo bootstrap and regime analysis all
    stress-test an edge from different angles.
-3. **Paper trading** *(zero capital)* — a live data feed with simulated orders for weeks;
-   likely a new `papertrade/` module.
+3. **Paper trading** *(in progress)* — the `papertrade/` module runs a strategy forward on live
+   data with simulated fills and a persistent account, to validate it over weeks at zero capital.
 4. **Live, bounded, tiny** — only if an edge survives, as an approved rule-based bot with hard
    risk limits and SEBI algo registration.
 

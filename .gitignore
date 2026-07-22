@@ -38,6 +38,10 @@ correlation/correlation
 backtest/data/*.csv
 backtest/backtest
 
+# papertrade: built binary and paper-account state (user data, never committed)
+papertrade/papertrade
+papertrade/accounts/
+
 # Python bytecode
 __pycache__/
 *.pyc
