@@ -62,6 +62,7 @@ papertrade step  --dir <dir> [--force]
 papertrade status --dir <dir>
 papertrade summary --dir <dir>
 papertrade history --dir <dir>
+papertrade list --root <dir>
 papertrade version
 ```
 
@@ -78,6 +79,9 @@ papertrade version
   CAGR, annualised vol, Sharpe and max drawdown, next to a **buy-and-hold benchmark** over the
   same dates and the edge against it. Needs at least two days of history.
 - **history** — the full fills log (date, side, shares, price, cost, equity after).
+- **list** — a one-line overview of every account under a `--root` directory (strategy, symbol,
+  last bar, current equity, return, fills). Handy when running several paper strategies at once;
+  reads stored state only, no network.
 
 Each account is a directory holding `account.json` (state), `fills.jsonl` (every trade) and
 `equity.jsonl` (a daily marked-to-market snapshot). **Keep account directories out of version

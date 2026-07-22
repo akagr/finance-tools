@@ -12,6 +12,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/akagr/finance-tools/papertrade/internal/account"
@@ -46,6 +48,8 @@ func main() {
 		os.Exit(cmdSummary(os.Args[2:]))
 	case "history":
 		os.Exit(cmdHistory(os.Args[2:]))
+	case "list", "ls":
+		os.Exit(cmdList(os.Args[2:]))
 	case "version":
 		fmt.Println("papertrade " + version)
 	case "-h", "--help", "help":
@@ -66,6 +70,7 @@ Usage:
   papertrade status --dir <dir>
   papertrade summary --dir <dir>
   papertrade history --dir <dir>
+  papertrade list --root <dir>
   papertrade version
 
 Run "papertrade init -h" or "papertrade step -h" for flags.
@@ -385,4 +390,104 @@ func orNone(s string) string {
 		return "(none yet)"
 	}
 	return s
+}
+
+// accountSummary is one line of the multi-account overview.
+type accountSummary struct {
+	Dir       string
+	Name      string
+	Strategy  string
+	Symbol    string
+	LastBar   string
+	Equity    float64
+	Return    float64
+	Fills     int
+	HasEquity bool
+}
+
+// scanAccounts finds every immediate subdirectory of root holding an account and
+// summarises it from stored state alone (no network). Results are sorted by
+// directory name for stable output.
+func scanAccounts(root string) ([]accountSummary, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	var out []accountSummary
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		dir := filepath.Join(root, e.Name())
+		st := store.New(dir)
+		if !st.Exists() {
+			continue
+		}
+		a, err := st.Load()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", dir, err)
+		}
+		s := accountSummary{
+			Dir: e.Name(), Name: a.Name, Strategy: a.Strategy.Name,
+			Symbol: a.Symbol, LastBar: a.LastBarDate,
+		}
+		if snaps, err := st.ReadEquity(); err == nil && len(snaps) > 0 {
+			last := snaps[len(snaps)-1]
+			s.Equity = last.Equity
+			s.HasEquity = true
+			if a.InitialCapital > 0 {
+				s.Return = last.Equity/a.InitialCapital - 1
+			}
+		}
+		if fills, err := st.ReadLog(); err == nil {
+			s.Fills = len(fills)
+		}
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Dir < out[j].Dir })
+	return out, nil
+}
+
+func cmdList(args []string) int {
+	fs := flag.NewFlagSet("list", flag.ExitOnError)
+	root := fs.String("root", "", "directory containing one or more account subdirectories")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *root == "" {
+		fmt.Fprintln(os.Stderr, "error: --root is required")
+		return 2
+	}
+	accounts, err := scanAccounts(*root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
+	if len(accounts) == 0 {
+		fmt.Printf("No paper accounts found under %s.\n", *root)
+		return 0
+	}
+	fmt.Printf("%-16s %-16s %-10s %-12s %14s %10s %7s\n",
+		"account", "strategy", "symbol", "last bar", "equity", "return", "fills")
+	for _, a := range accounts {
+		equity := "—"
+		ret := "—"
+		if a.HasEquity {
+			equity = fmt.Sprintf("%.2f", a.Equity)
+			ret = fmt.Sprintf("%.2f%%", a.Return*100)
+		}
+		fmt.Printf("%-16s %-16s %-10s %-12s %14s %10s %7d\n",
+			trunc(a.Dir, 16), trunc(a.Strategy, 16), trunc(a.Symbol, 10),
+			orNone(a.LastBar), equity, ret, a.Fills)
+	}
+	fmt.Println()
+	fmt.Println(disclaimer)
+	return 0
+}
+
+func trunc(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n-1] + "…"
 }
