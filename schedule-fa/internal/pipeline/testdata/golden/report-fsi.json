@@ -49,7 +49,7 @@
         "relief_inr": "1406.89"
       },
       "needs_review": true,
-      "review_note": "AAPL: payment in lieu of dividend (shares were on loan) — withheld at the US statutory 30%, not the 25% treaty rate, and not a qualified dividend; interest PAID of 3 USD is an expense, not income — it is excluded here; any s.57 claim must be made manually; withholding of 220.25 INR on 2025-11-20 could not be matched to a distribution — confirm the income it relates to before claiming the credit"
+      "review_note": "AAPL: payment in lieu of dividend (shares were on loan) — withheld at the US statutory 30%, not the 25% treaty rate, and not a qualified dividend; withholding of 220.25 INR on 2025-11-20 could not be matched to a distribution — confirm the income it relates to before claiming the credit; interest PAID of 3 USD is an expense, not income — it is excluded here; any s.57 claim must be made manually"
     },
     {
       "country_name": "Ireland",
@@ -237,6 +237,7 @@
     {
       "type": "Dividend",
       "security": "AAPL",
+      "country_name": "United States of America",
       "country_code": "2",
       "income_inr": "3488.00",
       "tax_paid_inr": "872.00",
@@ -262,6 +263,7 @@
     {
       "type": "Payment in lieu of dividend",
       "security": "AAPL",
+      "country_name": "United States of America",
       "country_code": "2",
       "income_inr": "1048.80",
       "tax_paid_inr": "314.64",
@@ -287,6 +289,7 @@
     {
       "type": "Dividend",
       "security": "VWRA",
+      "country_name": "Ireland",
       "country_code": "353",
       "income_inr": "1573.20",
       "tax_paid_inr": "0.00",
@@ -304,6 +307,7 @@
     {
       "type": "Interest",
       "security": "USD CREDIT INTEREST",
+      "country_name": "United States of America",
       "country_code": "2",
       "income_inr": "2237.50",
       "tax_paid_inr": "0.00",
@@ -321,6 +325,7 @@
     {
       "type": "Unattributed withholding",
       "security": "MSFT",
+      "country_name": "United States of America",
       "country_code": "2",
       "income_inr": "0.00",
       "tax_paid_inr": "220.25",

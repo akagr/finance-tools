@@ -285,3 +285,45 @@ func TestFYAndAYLabels(t *testing.T) {
 		t.Errorf("FY label at the century boundary = %s, want %s", got, want)
 	}
 }
+
+// A security that paid several substitute dividends, or several debit-interest
+// rows, must not repeat the same warning once per transaction — the review note
+// is meant to be read.
+func TestReviewNotesAreNotRepeated(t *testing.T) {
+	store := testStore(t, map[string]string{
+		"2025-07-31": "80.00", "2025-08-29": "80.00", "2025-10-31": "80.00", "2026-03-31": "80.00",
+	})
+	pil := func(d string) model.Dividend {
+		return model.Dividend{
+			Instrument: model.Instrument{Symbol: "IBKR", ISIN: "US45841N1072", ListingCtry: "US"},
+			PayDate:    day(d),
+			Gross:      model.NewMoney(model.USD, big.NewRat(10, 1)),
+			Kind:       model.DividendInLieu,
+		}
+	}
+	st := &model.Statement{
+		From: day("2025-04-01"), To: day("2026-03-31"),
+		Account:   model.Account{IBEntity: "IBLLC-US"},
+		Dividends: []model.Dividend{pil("2025-08-14"), pil("2025-09-05"), pil("2025-11-20")},
+		Interest: []model.Interest{
+			{Date: day("2025-08-14"), Amount: model.NewMoney(model.USD, big.NewRat(-3, 1))},
+			{Date: day("2025-09-05"), Amount: model.NewMoney(model.USD, big.NewRat(-4, 1))},
+		},
+	}
+	rep, err := Build(st, store, opts())
+	if err != nil {
+		t.Fatal(err)
+	}
+	note := rep.Countries[0].ReviewNote
+
+	if n := strings.Count(note, "payment in lieu of dividend"); n != 1 {
+		t.Errorf("payment-in-lieu warning appears %d times, want 1:\n%s", n, note)
+	}
+	if n := strings.Count(note, "interest PAID"); n != 1 {
+		t.Errorf("interest-paid warning appears %d times, want 1:\n%s", n, note)
+	}
+	// The aggregated interest note should carry the total, not one row's amount.
+	if !strings.Contains(note, "7") {
+		t.Errorf("interest-paid note should total the debits (7 USD):\n%s", note)
+	}
+}

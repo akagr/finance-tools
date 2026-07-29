@@ -298,7 +298,8 @@ schedulefa generate \
   `gains` (24-month term, 23-Jul-2024 rate split, per-leg vs net-gain FX, cross-checked against
   IBKR's `fifoPnlRealized`), `fsi` (the country × head grid, Schedule TR, Form 67 worksheet,
   Schedule CG/OS tie-out) and `itr` (the ITR country-code list, shared with FA). Renders md/csv/
-  json plus a fragment in the ITD ITR-2 schema's own field names, which is validated against
+  json/html (the HTML sharing its stylesheet with the FA report, so the two print as one pack)
+  plus a fragment in the ITD ITR-2 schema's own field names, which is validated against
   that schema. Column (d) comes from explicit `--marginal-rate`/`--surcharge`/`--cess`
   assumptions, never a silent guess.
 

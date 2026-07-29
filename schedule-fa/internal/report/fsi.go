@@ -7,6 +7,8 @@
 //	                 figure, the assumptions made, and what still needs review
 //	report-fsi.csv   flat rows for transcription into the ITR utility
 //	report-fsi.json  the full model, audit trail included
+//	report-fsi.html  the same, printable (Print → Save as PDF), styled to match
+//	                 the Schedule FA report so the two print as one pack
 //	schedule-fsi.json  a fragment shaped like the ITD's own ITR-2 JSON schema
 //	                 (ScheduleFSIDtls / ScheduleTR1), whole rupees
 //
@@ -48,8 +50,10 @@ func FSIFor(f Format) (FSIRenderer, error) {
 		return fsiCSV{}, nil
 	case JSON:
 		return fsiJSON{}, nil
+	case HTML:
+		return fsiHTML{}, nil
 	default:
-		return nil, fmt.Errorf("report: unknown format %q for Schedule FSI (want md, csv or json)", f)
+		return nil, fmt.Errorf("report: unknown format %q for Schedule FSI (want md, csv, json or html)", f)
 	}
 }
 
@@ -371,6 +375,7 @@ type jsonDisposal struct {
 type jsonOSLine struct {
 	Type        string      `json:"type"`
 	Security    string      `json:"security"`
+	CountryName string      `json:"country_name"`
 	CountryCode string      `json:"country_code"`
 	Income      string      `json:"income_inr"`
 	TaxPaid     string      `json:"tax_paid_inr"`
@@ -384,7 +389,9 @@ type jsonTieOut struct {
 	ScheduleOS         string `json:"schedule_os_inr"`
 }
 
-func (fsiJSON) RenderFSI(w io.Writer, r *fsi.Report) error {
+// fsiView builds the shared view model behind the JSON and HTML renderers,
+// so the two can never disagree about a formatted figure.
+func fsiView(r *fsi.Report) (jsonFSIReport, error) {
 	out := jsonFSIReport{
 		FinancialYear:  r.FYLabel(),
 		AssessmentYear: r.AYLabel(),
@@ -447,13 +454,22 @@ func (fsiJSON) RenderFSI(w io.Writer, r *fsi.Report) error {
 	}
 	for _, l := range r.OtherSource {
 		jl := jsonOSLine{
-			Type: l.Type, Security: l.Security, CountryCode: l.CountryCode,
+			Type: l.Type, Security: l.Security,
+			CountryName: l.CountryName, CountryCode: l.CountryCode,
 			Income: money(l.Income), TaxPaid: money(l.TaxPaid),
 		}
 		for _, c := range l.Audit {
 			jl.Audit = append(jl.Audit, auditOf(l.Type, c))
 		}
 		out.OtherSource = append(out.OtherSource, jl)
+	}
+	return out, nil
+}
+
+func (fsiJSON) RenderFSI(w io.Writer, r *fsi.Report) error {
+	out, err := fsiView(r)
+	if err != nil {
+		return err
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")

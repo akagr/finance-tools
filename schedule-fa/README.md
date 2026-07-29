@@ -9,7 +9,8 @@ schedules, with a full audit trail behind every figure:
 - **`fsi`** → **Schedule FSI + Schedule TR** and a **Form 67** worksheet: the Apr–Mar
   **financial** year, capital gains and other-source income computed under **Rule 115**
   (and foreign tax under Rule 128(8)), with the foreign tax credit worked out per country.
-  Markdown, CSV, JSON, plus a fragment in the ITD's own ITR-2 JSON field names.
+  Markdown, CSV, JSON, a printable HTML, plus a fragment in the ITD's own ITR-2 JSON
+  field names.
 
 > The two schedules are **not** comparable figure-for-figure: different period, different
 > exchange-rate rule. Run both — the FSI report prints the tie-out figures you need.
@@ -150,13 +151,15 @@ TTBR, and the exact rate date used) and a reconciliation summary.
   --entities data/entities/entities.csv \
   --tin XXXXX1234X \                              # your TIN in the source country
   --marginal-rate 30 --surcharge 0 --cess 4 \     # your Indian slab assumptions
-  --out private/report --format md,csv,json
+  --out private/report --format md,csv,json,html
 ```
 
-Outputs `report-fsi.md` / `.csv` / `.json` plus `schedule-fsi.json` — a fragment using the ITD
+Outputs `report-fsi.md` / `.csv` / `.json` / `.html` plus `schedule-fsi.json` — a fragment using the ITD
 ITR-2 schema's own field names (`ScheduleFSIDtls`, `ScheduleTR1`) in whole rupees, validated
 against that schema. The utility cannot import a single schedule, so the **CSV/Markdown tables
-are what you transcribe**; the fragment is for anyone assembling a full ITR JSON by hand.
+are what you transcribe**; the fragment is for anyone assembling a full ITR JSON by hand. The
+HTML is styled to match the Schedule FA report, so **Print → Save as PDF** on both gives one
+consistent pack to hand a CA.
 
 ### The three inputs only you can supply
 
@@ -215,7 +218,8 @@ All milestones complete (M0–M8):
 - **M8 — Schedule FSI + TR** — financial-year ingest (closed lots, interest, payments in lieu,
   unattributed withholding); Rule 115 / Rule 128(8) conversion; a capital-gains engine
   (24-month term, 23-Jul-2024 rate split, per-leg vs net-gain FX); the country × head FSI grid
-  with relief; Schedule TR; a Form 67 worksheet; and an ITD-schema-shaped JSON fragment.
+  with relief; Schedule TR; a Form 67 worksheet; a printable HTML matching the FA report; and
+  an ITD-schema-shaped JSON fragment.
 
 ## Build & test
 

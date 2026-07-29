@@ -42,6 +42,7 @@ type auditGroup struct {
 }
 
 type auditLine struct {
+	Figure   string
 	Source   string
 	TTBR     string
 	RateDate string
@@ -123,13 +124,9 @@ var htmlTemplate = template.Must(
 		Parse(htmlSource),
 )
 
-const htmlSource = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Schedule FA — {{.Report.Year}}</title>
-<style>
+// htmlStyle is shared by the Schedule FA and Schedule FSI pages so the two
+// printable reports cannot drift apart visually.
+const htmlStyle = `<style>
   :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --warn:#a8400a; --bg:#fff; }
   * { box-sizing: border-box; }
   body { font: 14px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -158,7 +155,15 @@ const htmlSource = `<!doctype html>
     details > *:not(summary) { display: block; }
     summary { list-style: none; }
   }
-</style>
+</style>`
+
+const htmlSource = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule FA — {{.Report.Year}}</title>
+` + htmlStyle + `
 </head>
 <body>
 <h1>Schedule FA — calendar year {{.Report.Year}}</h1>

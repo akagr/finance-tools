@@ -18,7 +18,7 @@ Taxpayer Identification Number: XXXXX1234X
 
 - _Capital Gains: the US does not tax a non-resident alien's gains on listed stock, so no credit arises_
 - _Other Sources: dividends and interest are aggregated in this row; cite the article for the income actually bearing the tax (10 dividends, 11 interest)_
-- ⚠︎ _AAPL: payment in lieu of dividend (shares were on loan) — withheld at the US statutory 30%, not the 25% treaty rate, and not a qualified dividend; interest PAID of 3 USD is an expense, not income — it is excluded here; any s.57 claim must be made manually; withholding of 220.25 INR on 2025-11-20 could not be matched to a distribution — confirm the income it relates to before claiming the credit_
+- ⚠︎ _AAPL: payment in lieu of dividend (shares were on loan) — withheld at the US statutory 30%, not the 25% treaty rate, and not a qualified dividend; withholding of 220.25 INR on 2025-11-20 could not be matched to a distribution — confirm the income it relates to before claiming the credit; interest PAID of 3 USD is an expense, not income — it is excluded here; any s.57 claim must be made manually_
 
 ## Ireland (country code 353)
 

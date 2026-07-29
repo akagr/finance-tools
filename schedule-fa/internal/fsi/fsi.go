@@ -192,6 +192,8 @@ type bucket struct {
 	osTaxPaid  *big.Rat
 	hasDiv     bool
 	hasInt     bool
+	intPaid    *big.Rat // interest debited, in the trade currency
+	intPaidCur model.Currency
 	notes      []string
 }
 
@@ -200,6 +202,7 @@ func newBucket(name, code string) *bucket {
 		name: name, code: code,
 		stcg: new(big.Rat), ltcg: new(big.Rat), ltcgPreCut: new(big.Rat),
 		cgTaxPaid: new(big.Rat), osIncome: new(big.Rat), osTaxPaid: new(big.Rat),
+		intPaid: new(big.Rat),
 	}
 }
 
@@ -306,8 +309,10 @@ func Build(st *model.Statement, store fx.Store, opts Options) (*Report, error) {
 		}
 		b := get(name, code)
 		if in.Amount.Amount != nil && in.Amount.Amount.Sign() < 0 {
-			b.notes = append(b.notes, "interest PAID of "+ratStr(new(big.Rat).Abs(in.Amount.Amount))+
-				" "+string(in.Amount.Currency)+" is an expense, not income — it is excluded here; any s.57 claim must be made manually")
+			// Debit interest is an expense, not negative income. Accumulate it
+			// so several rows produce one note rather than one note each.
+			b.intPaid.Add(b.intPaid, new(big.Rat).Abs(in.Amount.Amount))
+			b.intPaidCur = in.Amount.Currency
 			continue
 		}
 		// Rule 115 pins "other income" to 31 March of the previous year, so
@@ -436,7 +441,11 @@ func (b *bucket) countryRow(opts Options) CountryRow {
 		row.Total.Relief.Add(row.Total.Relief, hr.Relief)
 	}
 
-	notes := append([]string(nil), b.notes...)
+	notes := dedupe(b.notes)
+	if b.intPaid.Sign() > 0 {
+		notes = append(notes, "interest PAID of "+ratStr(b.intPaid)+" "+string(b.intPaidCur)+
+			" is an expense, not income — it is excluded here; any s.57 claim must be made manually")
+	}
 	if b.code == "" {
 		notes = append(notes, "country code unknown — set it via --entities (the ITR utility rejects a blank or wrong code)")
 	}
@@ -629,6 +638,22 @@ func ratStr(r *big.Rat) string {
 	}
 	s := r.FloatString(2)
 	return strings.TrimSuffix(strings.TrimRight(s, "0"), ".")
+}
+
+// dedupe drops repeated notes while preserving order. Several transactions in
+// the same security raise the same warning, and a review note that repeats
+// itself once per transaction stops being read.
+func dedupe(notes []string) []string {
+	seen := make(map[string]bool, len(notes))
+	out := make([]string, 0, len(notes))
+	for _, n := range notes {
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
 }
 
 func firstNonEmpty(vals ...string) string {

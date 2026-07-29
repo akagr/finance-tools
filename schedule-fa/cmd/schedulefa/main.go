@@ -255,7 +255,7 @@ func cmdFSI(args []string) int {
 		cess      = fs.String("cess", "4", "health and education cess in percent")
 		cgFX      = fs.String("cg-fx", "per-leg", "capital-gains FX method: per-leg (cost at acquisition month) or net-gain (whole gain at transfer month)")
 		out       = fs.String("out", "private/report", "output directory (default under gitignored private/)")
-		format    = fs.String("format", "md,csv,json", "comma-separated: md,csv,json")
+		format    = fs.String("format", "md,csv,json,html", "comma-separated: md,csv,json,html")
 	)
 	fs.Parse(args)
 
@@ -278,7 +278,7 @@ func cmdFSI(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
 	}
-	formats, err := parseFSIFormats(*format)
+	formats, err := parseFormats(*format)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
@@ -384,19 +384,6 @@ func cmdFSI(args []string) int {
 	}
 	fmt.Fprintln(os.Stderr, "\n"+disclaimer)
 	return 0
-}
-
-func parseFSIFormats(s string) ([]report.Format, error) {
-	formats, err := parseFormats(s)
-	if err != nil {
-		return nil, err
-	}
-	for _, f := range formats {
-		if f == report.HTML {
-			return nil, fmt.Errorf("--format html is not supported for Schedule FSI (want md,csv,json)")
-		}
-	}
-	return formats, nil
 }
 
 func parseFormats(s string) ([]report.Format, error) {

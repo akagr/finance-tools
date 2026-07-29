@@ -49,7 +49,7 @@ func TestCmdFSIFlagValidation(t *testing.T) {
 		{"online missing query", []string{"--fy", "2025-26", "--flex-token", "T"}, 2},
 		{"unknown cg method", []string{"--fy", "2025-26", "--statement", "x.xml", "--cg-fx", "spot"}, 2},
 		{"negative marginal rate", []string{"--fy", "2025-26", "--statement", "x.xml", "--marginal-rate", "-5"}, 2},
-		{"html not supported", []string{"--fy", "2025-26", "--statement", "x.xml", "--format", "html"}, 2},
+		{"unknown format", []string{"--fy", "2025-26", "--statement", "x.xml", "--format", "pdf"}, 2},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,12 +73,12 @@ func TestCmdFSIWritesReports(t *testing.T) {
 		"--entities", "../../internal/pipeline/testdata/entities.csv",
 		"--tin", "XXXXX1234X",
 		"--out", out,
-		"--format", "md,csv,json",
+		"--format", "md,csv,json,html",
 	}
 	if got := cmdFSI(args); got != 0 {
 		t.Fatalf("cmdFSI = %d, want 0", got)
 	}
-	for _, name := range []string{"report-fsi.md", "report-fsi.csv", "report-fsi.json", "schedule-fsi.json"} {
+	for _, name := range []string{"report-fsi.md", "report-fsi.csv", "report-fsi.json", "report-fsi.html", "schedule-fsi.json"} {
 		info, err := os.Stat(filepath.Join(out, name))
 		if err != nil {
 			t.Errorf("%s not written: %v", name, err)

@@ -51,7 +51,7 @@ func buildFSIFixture(t *testing.T, method gains.Method) *fsi.Report {
 func TestGoldenFSIReport(t *testing.T) {
 	rep := buildFSIFixture(t, gains.PerLeg)
 
-	for _, f := range []report.Format{report.CSV, report.JSON, report.Markdown} {
+	for _, f := range []report.Format{report.CSV, report.JSON, report.Markdown, report.HTML} {
 		rnd, err := report.FSIFor(f)
 		if err != nil {
 			t.Fatal(err)
