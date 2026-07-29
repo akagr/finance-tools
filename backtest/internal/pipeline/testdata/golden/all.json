@@ -9,7 +9,7 @@
     "stt_bps": 10,
     "slippage_bps": 5,
     "notes": [
-      "1 of 5 strategies beat buy-and-hold after costs over this period. Beating a benchmark on past data is not an edge — it is a hypothesis to validate out-of-sample before risking capital."
+      "1 of 6 strategies beat buy-and-hold after costs over this period. Beating a benchmark on past data is not an edge — it is a hypothesis to validate out-of-sample before risking capital."
     ]
   },
   "lines": [
@@ -72,6 +72,21 @@
       "turnover": 0,
       "total_cost": 0,
       "exposure": 0
+    },
+    {
+      "strategy": "dip(1%)",
+      "total_return": -0.05888324171992021,
+      "cagr": -0.12570839473898043,
+      "ann_vol": 0.06905133794870877,
+      "sharpe": -1.826496091706387,
+      "sortino": -2.5708091431837987,
+      "max_drawdown": 0.07291168401437143,
+      "calmar": -1.7241186572264933,
+      "final_value": 94111.67582800798,
+      "trades": 5,
+      "turnover": 502631.77562617615,
+      "total_cost": 753.9476634392641,
+      "exposure": 0.5833333333333334
     },
     {
       "strategy": "rsi(14\u003c30)",

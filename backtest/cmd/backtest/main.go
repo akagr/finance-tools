@@ -78,6 +78,7 @@ Strategies (each is run against a buy-and-hold benchmark):
   momentum    time-series momentum     flag:  --lookback
   rsi         RSI oversold (contrarian) flags: --rsi-period --rsi-threshold
   donchian    channel breakout (Turtle) flags: --entry --exit
+  dip         buy the dip below all-time high flag: --dip-drop
   buy-hold    always fully invested
 
 "run" backtests once over the whole history; "walkforward" splits the history into
@@ -97,7 +98,7 @@ func cmdRun(args []string) int {
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat     = fs.String("strategy", "sma-cross", "strategy: all|sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
+		strat     = fs.String("strategy", "sma-cross", "strategy: all|sma-cross|ema-cross|momentum|rsi|donchian|dip|buy-hold")
 		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
 		slow      = fs.Int("slow", 50, "slow MA window (sma-cross, ema-cross)")
 		lookback  = fs.Int("lookback", 120, "lookback window in bars (momentum)")
@@ -105,6 +106,7 @@ func cmdRun(args []string) int {
 		rsiThresh = fs.Float64("rsi-threshold", 30, "buy when RSI is below this (rsi)")
 		entry     = fs.Int("entry", 20, "breakout entry window in bars (donchian)")
 		exit      = fs.Int("exit", 10, "breakdown exit window in bars (donchian)")
+		dipDrop   = fs.Float64("dip-drop", 1, "buy when this percent below the running peak (dip)")
 		capital   = fs.Float64("capital", 100000, "initial capital in INR")
 		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
@@ -134,6 +136,7 @@ func cmdRun(args []string) int {
 		RSIThreshold:   *rsiThresh,
 		DonchianEntry:  *entry,
 		DonchianExit:   *exit,
+		DipDrop:        *dipDrop,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		SortBy:         *sortBy,
@@ -188,7 +191,7 @@ func cmdWalkForward(args []string) int {
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|dip")
 		folds     = fs.Int("folds", 4, "number of consecutive out-of-sample folds")
 		optimize  = fs.Bool("optimize", false, "re-fit parameters on each training window before testing the next fold")
 		rolling   = fs.Bool("rolling", false, "with --optimize: train on a fixed trailing window instead of all prior data")
@@ -200,6 +203,7 @@ func cmdWalkForward(args []string) int {
 		rsiThresh = fs.Float64("rsi-threshold", 30, "buy when RSI is below this (rsi)")
 		entry     = fs.Int("entry", 20, "breakout entry window in bars (donchian)")
 		exit      = fs.Int("exit", 10, "breakdown exit window in bars (donchian)")
+		dipDrop   = fs.Float64("dip-drop", 1, "buy when this percent below the running peak (dip)")
 		capital   = fs.Float64("capital", 100000, "initial capital in INR")
 		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
@@ -228,6 +232,7 @@ func cmdWalkForward(args []string) int {
 		RSIThreshold:   *rsiThresh,
 		DonchianEntry:  *entry,
 		DonchianExit:   *exit,
+		DipDrop:        *dipDrop,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		VolTarget:      *volTarget / 100,
@@ -359,6 +364,8 @@ func defaultSweepAxes(strategy string) []pipeline.SweepAxis {
 		return []pipeline.SweepAxis{{Name: "rsi-period", Min: 5, Max: 25, Step: 5}, {Name: "rsi-threshold", Min: 20, Max: 40, Step: 5}}
 	case "donchian":
 		return []pipeline.SweepAxis{{Name: "entry", Min: 10, Max: 60, Step: 10}, {Name: "exit", Min: 5, Max: 30, Step: 5}}
+	case "dip":
+		return []pipeline.SweepAxis{{Name: "dip-drop", Min: 1, Max: 10, Step: 1}}
 	default:
 		return nil
 	}
@@ -371,7 +378,7 @@ func cmdSweep(args []string) int {
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|dip")
 		metric    = fs.String("metric", "sharpe", "grid metric: return|cagr|sharpe|sortino|calmar|drawdown")
 		fast      = fs.Int("fast", 20, "fixed fast MA window when not swept (sma-cross, ema-cross)")
 		slow      = fs.Int("slow", 50, "fixed slow MA window when not swept (sma-cross, ema-cross)")
@@ -380,6 +387,7 @@ func cmdSweep(args []string) int {
 		rsiThresh = fs.Float64("rsi-threshold", 30, "fixed RSI threshold when not swept (rsi)")
 		entry     = fs.Int("entry", 20, "fixed breakout entry window when not swept (donchian)")
 		exit      = fs.Int("exit", 10, "fixed breakdown exit window when not swept (donchian)")
+		dipDrop   = fs.Float64("dip-drop", 1, "fixed dip drop percent when not swept (dip)")
 		capital   = fs.Float64("capital", 100000, "initial capital in INR")
 		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
@@ -426,6 +434,7 @@ func cmdSweep(args []string) int {
 		RSIThreshold:   *rsiThresh,
 		DonchianEntry:  *entry,
 		DonchianExit:   *exit,
+		DipDrop:        *dipDrop,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		VolTarget:      *volTarget / 100,
@@ -480,7 +489,7 @@ func cmdMonteCarlo(args []string) int {
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|dip|buy-hold")
 		trials    = fs.Int("trials", 1000, "number of bootstrap trials")
 		seed      = fs.Int64("seed", 1, "random seed (fixed for reproducibility)")
 		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
@@ -490,6 +499,7 @@ func cmdMonteCarlo(args []string) int {
 		rsiThresh = fs.Float64("rsi-threshold", 30, "buy when RSI is below this (rsi)")
 		entry     = fs.Int("entry", 20, "breakout entry window in bars (donchian)")
 		exit      = fs.Int("exit", 10, "breakdown exit window in bars (donchian)")
+		dipDrop   = fs.Float64("dip-drop", 1, "buy when this percent below the running peak (dip)")
 		capital   = fs.Float64("capital", 100000, "initial capital in INR")
 		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
@@ -518,6 +528,7 @@ func cmdMonteCarlo(args []string) int {
 		RSIThreshold:   *rsiThresh,
 		DonchianEntry:  *entry,
 		DonchianExit:   *exit,
+		DipDrop:        *dipDrop,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		VolTarget:      *volTarget / 100,
@@ -570,7 +581,7 @@ func cmdRegime(args []string) int {
 	var (
 		pricesP   = fs.String("prices", "", "price CSV file (columns: date,symbol,close)")
 		symbol    = fs.String("symbol", "", "symbol in the CSV to test (default: first found)")
-		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|buy-hold")
+		strat     = fs.String("strategy", "sma-cross", "strategy: sma-cross|ema-cross|momentum|rsi|donchian|dip|buy-hold")
 		trendMA   = fs.Int("trend-ma", 200, "moving-average window for the bull/bear split")
 		volWindow = fs.Int("vol-window", 20, "trailing window for the high/low volatility split")
 		fast      = fs.Int("fast", 20, "fast MA window (sma-cross, ema-cross)")
@@ -580,6 +591,7 @@ func cmdRegime(args []string) int {
 		rsiThresh = fs.Float64("rsi-threshold", 30, "buy when RSI is below this (rsi)")
 		entry     = fs.Int("entry", 20, "breakout entry window in bars (donchian)")
 		exit      = fs.Int("exit", 10, "breakdown exit window in bars (donchian)")
+		dipDrop   = fs.Float64("dip-drop", 1, "buy when this percent below the running peak (dip)")
 		capital   = fs.Float64("capital", 100000, "initial capital in INR")
 		brokBps   = fs.Float64("brokerage-bps", 0, "brokerage per trade, basis points")
 		sttBps    = fs.Float64("stt-bps", 10, "securities transaction tax per trade, basis points")
@@ -608,6 +620,7 @@ func cmdRegime(args []string) int {
 		RSIThreshold:   *rsiThresh,
 		DonchianEntry:  *entry,
 		DonchianExit:   *exit,
+		DipDrop:        *dipDrop,
 		InitialCapital: *capital,
 		Costs:          engine.Costs{BrokerageBps: *brokBps, STTBps: *sttBps, SlippageBps: *slipBps},
 		VolTarget:      *volTarget / 100,

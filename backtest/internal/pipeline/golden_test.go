@@ -81,6 +81,7 @@ func TestGoldenStrategies(t *testing.T) {
 		{"momentum.md", func(o *Options) { o.Strategy = "momentum"; o.Lookback = 20 }},
 		{"rsi.md", func(o *Options) { o.Strategy = "rsi"; o.RSIPeriod = 14; o.RSIThreshold = 45 }},
 		{"donchian.md", func(o *Options) { o.Strategy = "donchian"; o.DonchianEntry = 20; o.DonchianExit = 10 }},
+		{"dip.md", func(o *Options) { o.Strategy = "dip"; o.DipDrop = 1 }},
 	}
 	for _, c := range cases {
 		opts := base

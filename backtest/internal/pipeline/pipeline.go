@@ -27,6 +27,7 @@ type Options struct {
 	RSIThreshold   float64 // buy when RSI is below this (rsi)
 	DonchianEntry  int     // breakout entry window (donchian)
 	DonchianExit   int     // breakdown exit window (donchian)
+	DipDrop        float64 // buy when this percent below the running peak (dip)
 	InitialCapital float64 // starting cash; defaults to 100000 if <= 0
 	Costs          engine.Costs
 	SortBy         string  // metric to rank the table by; "" = return (see sortKeys)
@@ -264,7 +265,7 @@ func maybeVolTarget(st strategy.Strategy, opts Options) (strategy.Strategy, erro
 
 // activeNames lists the non-benchmark strategies, in display order, that "all"
 // runs. Keep in sync with buildStrategy.
-var activeNames = []string{"sma-cross", "ema-cross", "momentum", "rsi", "donchian"}
+var activeNames = []string{"sma-cross", "ema-cross", "momentum", "rsi", "donchian", "dip"}
 
 func withStrategy(opts Options, name string) Options {
 	opts.Strategy = name
@@ -283,10 +284,12 @@ func buildStrategy(opts Options) (strategy.Strategy, error) {
 		return strategy.NewRSI(orDefaultInt(opts.RSIPeriod, 14), orDefaultFloat(opts.RSIThreshold, 30))
 	case "donchian":
 		return strategy.NewDonchian(orDefaultInt(opts.DonchianEntry, 20), orDefaultInt(opts.DonchianExit, 10))
+	case "dip":
+		return strategy.NewDip(orDefaultFloat(opts.DipDrop, 1))
 	case "buy-hold":
 		return strategy.BuyHold{}, nil
 	default:
-		return nil, fmt.Errorf("pipeline: unknown strategy %q (want all|sma-cross|ema-cross|momentum|rsi|donchian|buy-hold)", opts.Strategy)
+		return nil, fmt.Errorf("pipeline: unknown strategy %q (want all|sma-cross|ema-cross|momentum|rsi|donchian|dip|buy-hold)", opts.Strategy)
 	}
 }
 

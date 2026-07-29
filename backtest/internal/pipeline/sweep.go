@@ -249,6 +249,8 @@ func applyParam(opts Options, name string, v float64) (Options, error) {
 		opts.DonchianEntry = int(math.Round(v))
 	case "exit":
 		opts.DonchianExit = int(math.Round(v))
+	case "dip-drop":
+		opts.DipDrop = v
 	case "slippage-bps":
 		opts.Costs.SlippageBps = v
 	case "brokerage-bps":

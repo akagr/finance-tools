@@ -87,11 +87,12 @@ in so it is obvious which strategies actually beat it.
 | `momentum`  | trend          | long while price is above its own level `--lookback` bars ago          | `--lookback`                   |
 | `rsi`       | mean-reversion | buy when oversold (RSI below `--rsi-threshold`), else cash             | `--rsi-period` `--rsi-threshold` |
 | `donchian`  | breakout       | enter on a new `--entry`-bar high, exit on a new `--exit`-bar low       | `--entry` `--exit`             |
+| `dip`       | mean-reversion | long while price is at least `--dip-drop`% below its all-time high      | `--dip-drop`                   |
 | `buy-hold`  | benchmark      | always fully invested                                                  | —                              |
 
-The trend rules **buy strength**; `rsi` deliberately **buys weakness** — comparing them shows
-how a strategy's style interacts with a market's character (e.g. mean-reversion tends to bleed
-in a strong bull market).
+The trend rules **buy strength**; `rsi` and `dip` deliberately **buy weakness** — comparing them
+shows how a strategy's style interacts with a market's character (e.g. mean-reversion tends to
+bleed in a strong bull market).
 
 ### What each strategy is actually betting on
 
@@ -114,6 +115,11 @@ in a strong bull market).
   highest in the last `--entry` days (a breakout to new highs), and exit when it's the lowest in
   the last `--exit` days. It holds through everything in between, so it rides big trends but
   gives back some profit at every turn.
+- **`dip` (buy the dip below the all-time high)** — hold the asset whenever today's close is at
+  least `--dip-drop`% (default 1) below its running all-time high, and step aside once price has
+  climbed back to within that band of a fresh peak. Like `rsi` it bets on *mean reversion* after a
+  pullback, but it measures the drawdown against the running high rather than recent gains/losses,
+  so it stays long through an extended slump until a new high is reclaimed.
 - **`buy-hold`** — the benchmark: buy once, hold forever. No skill, no trading, minimal cost.
 
 Add your own by implementing `strategy.Strategy` — a `Target(closes) → weight` method — in a new
@@ -429,7 +435,7 @@ backtest run --prices <csv> [flags]
 
   --prices         price CSV file (columns: date,symbol,close) (required)
   --symbol         which symbol in the CSV to test (default: first found)
-  --strategy       all | sma-cross | ema-cross | momentum | rsi | donchian | buy-hold (default sma-cross)
+  --strategy       all | sma-cross | ema-cross | momentum | rsi | donchian | dip | buy-hold (default sma-cross)
   --fast           fast MA window, sma-cross/ema-cross (default 20)
   --slow           slow MA window, sma-cross/ema-cross (default 50)
   --lookback       lookback window in bars, momentum (default 120)
@@ -437,6 +443,7 @@ backtest run --prices <csv> [flags]
   --rsi-threshold  buy when RSI is below this, rsi (default 30)
   --entry          breakout entry window in bars, donchian (default 20)
   --exit           breakdown exit window in bars, donchian (default 10)
+  --dip-drop       buy when this percent below the running all-time high, dip (default 1)
   --vol-target     annualised volatility target in %, e.g. 10; 0 disables sizing (default 0)
   --vol-lookback   trailing bars used to estimate realised volatility (default 20)
   --capital        initial capital in INR (default 100000)
@@ -455,7 +462,7 @@ backtest walkforward --prices <csv> --strategy <name> [--folds N] [--optimize] [
 
 backtest sweep --prices <csv> --strategy <name> [--param name:min:max:step ...] [same cost flags]
   --param          parameter to sweep as name:min:max:step (repeatable, up to 2; default per strategy)
-                   names: fast|slow|lookback|rsi-period|rsi-threshold|entry|exit|slippage-bps|brokerage-bps|stt-bps|vol-target
+                   names: fast|slow|lookback|rsi-period|rsi-threshold|entry|exit|dip-drop|slippage-bps|brokerage-bps|stt-bps|vol-target
   --metric         grid metric: return | cagr | sharpe | sortino | calmar | drawdown (default sharpe)
 
 backtest montecarlo --prices <csv> --strategy <name> [--trials N] [--seed S] [strategy/cost flags]
