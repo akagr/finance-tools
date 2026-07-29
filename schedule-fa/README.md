@@ -21,24 +21,6 @@ challenges, decisions, architecture, and milestones.
 > **Disclaimer:** Not tax advice. The output is a working draft to verify (ideally with a
 > CA) before filing. You remain responsible for what you file.
 
-## Example output
-
-The printable HTML report (rendered from synthetic sample data — no real holdings):
-
-<p align="center">
-  <img src="docs/img/report-sample-v3.png" alt="Sample Schedule FA HTML report" width="640">
-</p>
-
-Complete example reports in every format live in
-[`internal/pipeline/testdata/golden/`](internal/pipeline/testdata/golden/) —
-[`report.md`](internal/pipeline/testdata/golden/report.md),
-[`report.csv`](internal/pipeline/testdata/golden/report.csv),
-[`report.json`](internal/pipeline/testdata/golden/report.json), and
-[`report.html`](internal/pipeline/testdata/golden/report.html). These are the golden fixtures
-the offline pipeline is tested against, so they always reflect the tool's current output.
-
----
-
 ## Getting your data from IBKR
 
 You need an **Activity Flex Query** (it defines what goes in the statement). Then either
@@ -135,6 +117,13 @@ Outputs land in `--out` (default `private/report/`): `report.md`, `report.csv`,
 into the ITR utility; the **Markdown/HTML** carry a per-figure audit trail (source amount,
 TTBR, and the exact rate date used) and a reconciliation summary.
 
+<p align="center">
+  <img src="docs/img/report-sample-v3.png" alt="Sample Schedule FA HTML report" width="640">
+</p>
+
+*(Rendered from the synthetic fixture — no real holdings. The full example lives in
+[`internal/pipeline/testdata/golden/report.html`](internal/pipeline/testdata/golden/report.html).)*
+
 > Keep real Flex exports and reports under `private/` (gitignored) — they contain your
 > account number, address, and holdings, and must never be committed. Use a **complete past
 > calendar year** export for a real filing (a year-to-date export is only a partial draft).
@@ -160,6 +149,13 @@ against that schema. The utility cannot import a single schedule, so the **CSV/M
 are what you transcribe**; the fragment is for anyone assembling a full ITR JSON by hand. The
 HTML is styled to match the Schedule FA report, so **Print → Save as PDF** on both gives one
 consistent pack to hand a CA.
+
+<p align="center">
+  <img src="docs/img/report-fsi-sample.png" alt="Sample Schedule FSI HTML report" width="640">
+</p>
+
+*(Rendered from the synthetic fixture — no real holdings. The full example lives in
+[`internal/pipeline/testdata/golden/report-fsi.html`](internal/pipeline/testdata/golden/report-fsi.html).)*
 
 ### The three inputs only you can supply
 
@@ -228,6 +224,18 @@ go build ./cmd/schedulefa      # from schedule-fa/
 go test ./...
 ```
 
-Golden fixtures for both schedules live in
-[`internal/pipeline/testdata/golden/`](internal/pipeline/testdata/golden/); refresh them with
-`go test ./internal/pipeline -update` and **review the diff** before committing.
+Complete example reports in every format live in
+[`internal/pipeline/testdata/golden/`](internal/pipeline/testdata/golden/) — Schedule FA as
+[`report.md`](internal/pipeline/testdata/golden/report.md),
+[`report.csv`](internal/pipeline/testdata/golden/report.csv),
+[`report.json`](internal/pipeline/testdata/golden/report.json) and
+[`report.html`](internal/pipeline/testdata/golden/report.html); Schedule FSI as
+[`report-fsi.md`](internal/pipeline/testdata/golden/report-fsi.md),
+[`report-fsi.csv`](internal/pipeline/testdata/golden/report-fsi.csv),
+[`report-fsi.json`](internal/pipeline/testdata/golden/report-fsi.json),
+[`report-fsi.html`](internal/pipeline/testdata/golden/report-fsi.html) and
+[`schedule-fsi.json`](internal/pipeline/testdata/golden/schedule-fsi.json).
+
+These are the golden fixtures the offline pipeline is tested against, so they always reflect the
+tool's current output. Refresh them with `go test ./internal/pipeline -update` and **review the
+diff** before committing.
