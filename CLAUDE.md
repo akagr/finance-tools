@@ -8,7 +8,7 @@ A monorepo of Go tools for Indian investors, all zero-dependency (Go stdlib only
 in one `go.work` workspace:
 
 - **`itr-foreign/`** — a CLI that turns Interactive Brokers (IBKR) holdings into Indian ITR
-  schedules: `generate` builds **Schedule FA** (Foreign Assets, calendar year) and `fsi` builds
+  schedules: `fa` builds **Schedule FA** (Foreign Assets, calendar year) and `fsi` builds
   **Schedule FSI + TR** (foreign income and tax relief, financial year) with a Form 67
   worksheet. The most developed tool; most of this doc is about it.
 - **`correlation/`** — computes return **correlations** across assets to gauge portfolio

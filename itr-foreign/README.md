@@ -3,7 +3,7 @@
 A Go CLI that turns **Interactive Brokers (IBKR)** holdings into ready-to-use Indian ITR
 schedules, with a full audit trail behind every figure:
 
-- **`generate`** → **Schedule FA** (Foreign Assets): the **calendar** year, SBI TT buying rate
+- **`fa`** → **Schedule FA** (Foreign Assets): the **calendar** year, SBI TT buying rate
   on each event date, and peak/closing/initial values per security. Markdown, CSV, JSON and a
   printable HTML.
 - **`fsi`** → **Schedule FSI + Schedule TR** and a **Form 67** worksheet: the Apr–Mar

@@ -265,7 +265,7 @@ itrforeign fa \
 - **M1 — IBKR ingest:** ✅ parse a downloaded Activity Flex **XML** (offline): account,
   open positions (+ lot detail), trades, dividends (with withholding matched), securities
   info. Year-constrained. Tolerant decode + flexible date parsing. Test in
-  `internal/ibkr/ibkr_test.go` against `testdata/sample_flex.xml`; `generate` prints a
+  `internal/ibkr/ibkr_test.go` against `testdata/sample_flex.xml`; `fa` prints a
   parse summary.
 - **M2 — FX engine:** ✅ `fx.CSVStore` loads the community SBI FX RateKeeper format
   (per-currency CSV; reads DATE + TT BUY; skips 0.00 non-publish days; latest-of-day wins).
@@ -273,7 +273,7 @@ itrforeign fa \
   Tested in `internal/fx/fx_test.go`.
 - **M3 — A3 (buy & hold):** ✅ `peak.Compute` (mode C) + `fa.Build` produce Table A3
   rows (initial/peak/closing/dividend/proceeds in INR, per-figure audit, review flags);
-  `report` renders md/csv/json with an audit trail + reconciliation. `generate` runs the
+  `report` renders md/csv/json with an audit trail + reconciliation. `fa` runs the
   full pipeline end-to-end. Conversion-date conventions documented in `build.go`.
 - **M4 — Exact peak:** ✅ `peak.ComputeExact` (mode B) reconstructs a daily share series and
   values it against a daily price series (`prices.CSVStore`, preceding-trading-day fallback)
@@ -286,7 +286,7 @@ itrforeign fa \
   corporate-action parsing + review flags; richer AccountInformation (address, ibEntity).
   Review flags now trip only on real data gaps. A2 rendered in md/json.
 - **M6 — Flex Web Service:** ✅ `ibkr.FlexClient` does the online pull
-  (SendRequest → poll GetStatement, handling the 1019 "generating" code). `generate`
+  (SendRequest → poll GetStatement, handling the 1019 "generating" code). `fa`
   accepts `--flex-token` + `--flex-query` (with `--save-statement` to keep the raw XML).
   Tested with an httptest fake server (poll-then-success, error, missing-creds).
 - **M8 — Schedule FSI + TR:** ✅ the income side of the same statement. `ibkr` gained
