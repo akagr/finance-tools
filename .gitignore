@@ -6,7 +6,7 @@
 *.prof
 vendor/
 # compiled CLI binary (built into the module dir by `go build`)
-schedule-fa/schedulefa
+itr-foreign/itrforeign
 
 # Editor / OS
 .DS_Store
@@ -25,9 +25,9 @@ flex-*.xml
 secrets.*
 
 # Third-party / user data (not vendored — see each dir's README)
-schedule-fa/data/ttbr/*.csv
-schedule-fa/data/prices/*.csv
-/schedulefa
+itr-foreign/data/ttbr/*.csv
+itr-foreign/data/prices/*.csv
+/itrforeign
 
 # correlation: fetched market data and built binary (not vendored)
 correlation/data/*.csv

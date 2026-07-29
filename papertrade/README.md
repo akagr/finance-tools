@@ -107,7 +107,7 @@ it here, and only consider real capital after weeks of clean paper results.
 - **Long-only, no leverage, one asset.** Mirrors the backtester. Buys are capped at available
   cash net of costs, so the account never goes into margin.
 - **Money is `float64`** — like `backtest`/`correlation`, this is research/simulation, not the
-  exact-money tax path used by `schedule-fa`.
+  exact-money tax path used by `itr-foreign`.
 - **Yahoo data is unofficial** and occasionally revises or gaps; it is fine for research, not for
   anything you'd trade real money on without a proper feed.
 

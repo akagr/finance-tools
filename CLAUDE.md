@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A monorepo of Go tools for Indian investors, all zero-dependency (Go stdlib only), Go 1.26,
 in one `go.work` workspace:
 
-- **`schedule-fa/`** — a CLI that turns Interactive Brokers (IBKR) holdings into Indian ITR
+- **`itr-foreign/`** — a CLI that turns Interactive Brokers (IBKR) holdings into Indian ITR
   schedules: `generate` builds **Schedule FA** (Foreign Assets, calendar year) and `fsi` builds
   **Schedule FSI + TR** (foreign income and tax relief, financial year) with a Form 67
   worksheet. The most developed tool; most of this doc is about it.
@@ -36,22 +36,22 @@ in one `go.work` workspace:
 
 ## Commands
 
-This is a `go.work` workspace. **Run all `go` commands from inside `schedule-fa/`** — `go ...
+This is a `go.work` workspace. **Run all `go` commands from inside `itr-foreign/`** — `go ...
 ./...` from the repo root fails (`directory prefix . does not contain modules listed in
 go.work`). `go` here is installed via **asdf** (`~/.asdf/shims/go`), so it's only on PATH in a
 login shell; non-login shells may need the full shim path.
 
 ```sh
-cd schedule-fa
+cd itr-foreign
 go test ./...                          # all tests
 go test -race ./...                    # what CI runs
 go test ./internal/peak -run Compute   # a single package / test
 go vet ./...
 gofmt -l .                             # CI fails if this prints anything; gofmt -w . to fix
-go build ./cmd/schedulefa
-go run ./cmd/schedulefa generate --year 2026 --statement <file.xml> --rates <ttbr.csv> [--prices <p.csv>] [--entities <e.csv>]
-go run ./cmd/schedulefa fetch-prices --year 2026 [--tickers <file>] [--out <file>]  # Yahoo daily closes → prices CSV
-go run ./cmd/schedulefa fsi --fy 2025-26 --statement <file.xml> --rates <ttbr.csv> --tin <TIN> --marginal-rate 30
+go build ./cmd/itrforeign
+go run ./cmd/itrforeign fa --year 2026 --statement <file.xml> --rates <ttbr.csv> [--prices <p.csv>] [--entities <e.csv>]
+go run ./cmd/itrforeign fetch-prices --year 2026 [--tickers <file>] [--out <file>]  # Yahoo daily closes → prices CSV
+go run ./cmd/itrforeign fsi --fy 2025-26 --statement <file.xml> --rates <ttbr.csv> --tin <TIN> --marginal-rate 30
 ```
 
 Golden tests (they lock the whole offline render path for **both** schedules — `report.*` for
@@ -73,7 +73,7 @@ Pipeline (one stage per package, lower-level deps only):
         │   fx (SBI TTBR at the event date)             rule115 (TTBR at the month end
         │   peak (per-security + true A2 NAV peak)        BEFORE the event; 128(8) for tax)
         │        ↓                                      gains (24-month term, 23-Jul-2024
-        │   schedulefa.Build (Tables A2 + A3)             split, per-leg vs net-gain FX)
+        │   fa.Build (Tables A2 + A3)             split, per-leg vs net-gain FX)
         │                                                     ↓
         │                                              fsi.Build (country × head + TR + Form 67)
         └───────────────────────────────┬────────────────────────────────┘
@@ -84,7 +84,7 @@ Pipeline (one stage per package, lower-level deps only):
 is shared by both branches, so FA and FSI can never disagree about a country code.
 
 - **`internal/pipeline.BuildReport`** (FA) and **`.BuildFSI`** (FSI) are the orchestration
-  seams shared by the CLI and the golden tests. `cmd/schedulefa/main.go` does only I/O (load statement/rates/prices/entities,
+  seams shared by the CLI and the golden tests. `cmd/itrforeign/main.go` does only I/O (load statement/rates/prices/entities,
   render, print); it must not re-implement pipeline logic. When adding pipeline steps, put
   them here, not in `main`.
 - **`internal/model`** holds broker-agnostic domain types. **Money is always exact
@@ -102,7 +102,7 @@ is shared by both branches, so FA and FSI can never disagree about a country cod
   fallback** (and `TT BUY = 0.00` non-publish days are skipped). Every INR figure carries an
   `fx.Conversion` audit record (source amount, rate, actual rate date used). The conversion
   *date* per field (initial→lot date, closing→31-Dec, dividend→pay date, proceeds→sell date)
-  is documented in `schedulefa/build.go`.
+  is documented in `fa/build.go`.
 - **Rule 115 ≠ the Schedule FA convention.** FA discloses assets at the TTBR of the *event
   date*. The income schedules compute income at the TTBR of the **last day of the month before**
   the event (31 March for "other income" such as broker interest), and foreign tax at the same
@@ -140,17 +140,17 @@ is shared by both branches, so FA and FSI can never disagree about a country cod
 ## Data & privacy
 
 - **Real IBKR exports and generated reports contain account numbers + holdings.** They live
-  under `schedule-fa/private/` which is **gitignored — never commit them.** Caveat that already
+  under `itr-foreign/private/` which is **gitignored — never commit them.** Caveat that already
   bit once: gitignore does **not** support inline comments; keep comments on their own line or
   a `private/   # ...` rule silently matches nothing.
 - TTBR data (`data/ttbr/*.csv`) and prices (`data/prices/*.csv`) are third-party/user data,
-  **not vendored** (gitignored); fetch via the README curl / `schedulefa fetch-prices` (Yahoo
+  **not vendored** (gitignored); fetch via the README curl / `itrforeign fetch-prices` (Yahoo
   chart API). `data/entities/*.csv` (issuer address/ZIP/country-code overrides) **is** committed.
 - Test fixtures are synthetic (e.g. account `U1234567`, "Jane Doe"). Keep them that way.
 
 ## Notes
 
 - Module path `github.com/akagr/finance-tools/...` is a placeholder; if the real remote differs,
-  update `schedule-fa/go.mod`, `go.work`, and the README CI badge.
+  update `itr-foreign/go.mod`, `go.work`, and the README CI badge.
 - Output is **not tax advice** — every report is a draft to verify; keep the disclaimer and the
   audit trail intact so a professional can check every number.

@@ -1,0 +1,581 @@
+// Command itrforeign builds the foreign-facing schedules of the Indian ITR from
+// Interactive Brokers holdings.
+//
+//	fa   Schedule FA (Foreign Assets), on the CALENDAR year: ingest a Flex
+//	     statement (saved XML or an online Flex Web Service pull) → convert at
+//	     the event-date SBI TTBR → compute peaks → Tables A2/A3 → render.
+//	fsi  Schedule FSI + TR and a Form 67 worksheet, on the Apr–Mar FINANCIAL
+//	     year, under Rule 115 and Rule 128(8).
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/csv"
+	"flag"
+	"fmt"
+	"io"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/akagr/finance-tools/itr-foreign/internal/entities"
+	"github.com/akagr/finance-tools/itr-foreign/internal/fsi"
+	"github.com/akagr/finance-tools/itr-foreign/internal/fx"
+	"github.com/akagr/finance-tools/itr-foreign/internal/gains"
+	"github.com/akagr/finance-tools/itr-foreign/internal/ibkr"
+	"github.com/akagr/finance-tools/itr-foreign/internal/model"
+	"github.com/akagr/finance-tools/itr-foreign/internal/peak"
+	"github.com/akagr/finance-tools/itr-foreign/internal/pipeline"
+	"github.com/akagr/finance-tools/itr-foreign/internal/prices"
+	"github.com/akagr/finance-tools/itr-foreign/internal/report"
+	"github.com/akagr/finance-tools/itr-foreign/internal/yahoo"
+)
+
+const disclaimer = "NOTE: not tax advice. Output is a working draft to verify before filing."
+
+func main() {
+	if len(os.Args) < 2 {
+		usage(os.Stderr)
+		os.Exit(2)
+	}
+	switch os.Args[1] {
+	case "fa":
+		os.Exit(cmdGenerate(os.Args[2:]))
+	case "generate":
+		// The pre-rename name, kept working so existing scripts do not break.
+		fmt.Fprintln(os.Stderr, `note: "generate" is now "fa"; the old name still works.`)
+		os.Exit(cmdGenerate(os.Args[2:]))
+	case "fsi":
+		os.Exit(cmdFSI(os.Args[2:]))
+	case "fetch-prices":
+		os.Exit(cmdFetchPrices(os.Args[2:]))
+	case "version":
+		fmt.Println("itrforeign 0.8.0")
+	case "-h", "--help", "help":
+		usage(os.Stdout)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", os.Args[1])
+		usage(os.Stderr)
+		os.Exit(2)
+	}
+}
+
+func usage(w *os.File) {
+	fmt.Fprintf(w, `itrforeign — the foreign-facing Indian ITR schedules, from IBKR holdings
+
+Usage:
+  itrforeign fa --year <YYYY> --statement <file.xml> [flags]              Schedule FA  (calendar year)
+  itrforeign fsi --fy <YYYY-YY> --statement <file.xml> [flags]            Schedule FSI + TR (financial year)
+  itrforeign fetch-prices --year <YYYY> [--tickers <file>] [--out <file>]
+  itrforeign version
+
+Schedule FA discloses foreign ASSETS over the calendar year at event-date SBI
+TTBR. Schedule FSI reports foreign INCOME over the Apr–Mar financial year under
+Rule 115 (TTBR of the last day of the preceding month). The two are not
+comparable figure-for-figure; run both.
+
+Run "itrforeign fa -h" or "itrforeign fsi -h" for flags.
+
+%s
+`, disclaimer)
+}
+
+func cmdGenerate(args []string) int {
+	fs := flag.NewFlagSet("generate", flag.ExitOnError)
+	var (
+		year      = fs.Int("year", 0, "CALENDAR year to report (Jan 1 – Dec 31), e.g. 2024")
+		statement = fs.String("statement", "", "path to an IBKR Activity Flex Query XML export (offline mode)")
+		flexToken = fs.String("flex-token", "", "IBKR Flex Web Service token (online mode)")
+		flexQuery = fs.String("flex-query", "", "IBKR Activity Flex Query id (online mode)")
+		saveStmt  = fs.String("save-statement", "", "when online, also save the fetched Flex XML to this path")
+		rates     = fs.String("rates", "", "path to an SBI TTBR rates CSV (overrides bundled)")
+		entitiesP = fs.String("entities", "data/entities", "entity metadata CSV file or dir (optional)")
+		pricesP   = fs.String("prices", "", "path to a daily prices CSV/dir (enables exact peak, mode B)")
+		out       = fs.String("out", "private/report", "output directory (default under gitignored private/)")
+		format    = fs.String("format", "md,csv,json", "comma-separated: md,csv,json,html")
+	)
+	fs.Parse(args)
+
+	// Enforce the calendar-year basis — the single most common Schedule FA error.
+	if *year == 0 {
+		fmt.Fprintln(os.Stderr, "error: --year is required (CALENDAR year, e.g. 2024 for AY 2025-26)")
+		return 2
+	}
+	if *year < 2000 || *year > 2099 {
+		fmt.Fprintf(os.Stderr, "error: --year %d is not a plausible calendar year\n", *year)
+		return 2
+	}
+	online := *flexToken != "" || *flexQuery != ""
+	if *statement == "" && !online {
+		fmt.Fprintln(os.Stderr, "error: provide --statement <file.xml> (offline) or --flex-token + --flex-query (online)")
+		return 2
+	}
+	if online && (*flexToken == "" || *flexQuery == "") {
+		fmt.Fprintln(os.Stderr, "error: online mode needs both --flex-token and --flex-query")
+		return 2
+	}
+
+	fmt.Printf("itrforeign: Schedule FA for calendar year %d (%d-01-01 to %d-12-31)\n", *year, *year, *year)
+
+	// Ingest: pull from the Flex Web Service (online) or parse a saved XML.
+	var st *model.Statement
+	if online {
+		fmt.Printf("  source           : Flex Web Service (query %s)\n", *flexQuery)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		body, err := ibkr.NewFlexClient().Fetch(ctx, *flexToken, *flexQuery)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if *saveStmt != "" {
+			if err := os.WriteFile(*saveStmt, body, 0o600); err != nil {
+				fmt.Fprintf(os.Stderr, "error: saving statement to %q: %v\n", *saveStmt, err)
+				return 1
+			}
+			fmt.Printf("  saved statement  : %s\n", *saveStmt)
+		}
+		st, err = ibkr.ParseFlexXML(bytes.NewReader(body), *year)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	} else {
+		var err error
+		st, err = ibkr.ParseFlexFile(*statement, *year)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	}
+	fmt.Printf("  account          : %s (%s), base %s\n", st.Account.Number, st.Account.Name, st.Account.BaseCurrency)
+	fmt.Printf("  open positions   : %d (year-end snapshot)\n", len(st.OpenPositions))
+	fmt.Printf("  lots/trades/divs : %d / %d / %d\n", len(st.Lots), len(st.Trades), len(st.Dividends))
+
+	// Load SBI TTBR rates (M2). Default to ./data/ttbr if --rates is omitted.
+	ratesPath := orDefault(*rates, "data/ttbr")
+	store, err := fx.LoadRateKeeper(ratesPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: loading TTBR rates from %q: %v\n", ratesPath, err)
+		fmt.Fprintln(os.Stderr, "hint: download a RateKeeper CSV (see data/ttbr/README.md) and pass --rates <file|dir>")
+		return 1
+	}
+	fmt.Printf("  rates            : %s\n", ratesPath)
+
+	// Prices enable the exact peak engine (mode B); otherwise mode C.
+	var priceProvider peak.PriceProvider
+	if *pricesP != "" {
+		priceStore, err := prices.Load(*pricesP)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: loading prices from %q: %v\n", *pricesP, err)
+			return 1
+		}
+		priceProvider = priceStore
+	}
+	ents, err := entities.Load(*entitiesP)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: loading entity metadata from %q: %v\n", *entitiesP, err)
+		return 1
+	}
+	res, err := pipeline.BuildReport(st, store, priceProvider, ents)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: building report: %v\n", err)
+		return 1
+	}
+	rep := res.Report
+	if res.ExactPeak {
+		fmt.Printf("  peak mode        : exact (mode B), prices %s%s\n", *pricesP, exactNote(res.A2PeakExact))
+	} else {
+		fmt.Printf("  peak mode        : approximate (mode C) — pass --prices for exact (mode B)\n")
+	}
+	formats, err := parseFormats(*format)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 2
+	}
+	paths, err := report.Write(*out, formats, rep)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: writing report: %v\n", err)
+		return 1
+	}
+
+	review := 0
+	for _, r := range rep.A3 {
+		if r.NeedsReview {
+			review++
+		}
+	}
+	fmt.Printf("  A3 rows          : %d  (%d need manual review)\n", len(rep.A3), review)
+	fmt.Printf("  wrote            : %s\n", strings.Join(paths, ", "))
+	fmt.Fprintln(os.Stderr, "\n"+disclaimer)
+	return 0
+}
+
+// parseFY accepts the ITR's own financial-year spelling ("2025-26" or "2025-2026",
+// and tolerates a bare "2025") and returns the starting calendar year.
+func parseFY(s string) (int, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, fmt.Errorf("--fy is required (FINANCIAL year, e.g. 2025-26 for AY 2026-27)")
+	}
+	parts := strings.SplitN(s, "-", 2)
+	start, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return 0, fmt.Errorf("--fy %q is not a financial year (want e.g. 2025-26)", s)
+	}
+	if start < 2000 || start > 2099 {
+		return 0, fmt.Errorf("--fy %q is not a plausible financial year", s)
+	}
+	if len(parts) == 2 {
+		end, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return 0, fmt.Errorf("--fy %q is not a financial year (want e.g. 2025-26)", s)
+		}
+		if end > 99 {
+			end %= 100
+		}
+		if end != (start+1)%100 {
+			return 0, fmt.Errorf("--fy %q spans more than one year — the Indian financial year runs 1 Apr to 31 Mar (e.g. %d-%02d)", s, start, (start+1)%100)
+		}
+	}
+	return start, nil
+}
+
+// cmdFSI builds Schedule FSI + TR for a financial year.
+func cmdFSI(args []string) int {
+	fs := flag.NewFlagSet("fsi", flag.ExitOnError)
+	var (
+		fy        = fs.String("fy", "", "FINANCIAL year to report (1 Apr – 31 Mar), e.g. 2025-26")
+		statement = fs.String("statement", "", "path to an IBKR Activity Flex Query XML export (offline mode)")
+		flexToken = fs.String("flex-token", "", "IBKR Flex Web Service token (online mode)")
+		flexQuery = fs.String("flex-query", "", "IBKR Activity Flex Query id (online mode)")
+		saveStmt  = fs.String("save-statement", "", "when online, also save the fetched Flex XML to this path")
+		rates     = fs.String("rates", "", "path to an SBI TTBR rates CSV (overrides bundled)")
+		entitiesP = fs.String("entities", "data/entities", "entity metadata CSV file or dir (optional)")
+		tin       = fs.String("tin", "", "your taxpayer identification number in the source country (passport number if none was allotted)")
+		marginal  = fs.String("marginal-rate", "30", "your slab rate in percent, applied to short-term gains and Other Sources")
+		surcharge = fs.String("surcharge", "0", "surcharge in percent of tax (capped at 15% on s.112 long-term gains)")
+		cess      = fs.String("cess", "4", "health and education cess in percent")
+		cgFX      = fs.String("cg-fx", "per-leg", "capital-gains FX method: per-leg (cost at acquisition month) or net-gain (whole gain at transfer month)")
+		out       = fs.String("out", "private/report", "output directory (default under gitignored private/)")
+		format    = fs.String("format", "md,csv,json,html", "comma-separated: md,csv,json,html")
+	)
+	fs.Parse(args)
+
+	fyStart, err := parseFY(*fy)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 2
+	}
+	online := *flexToken != "" || *flexQuery != ""
+	if *statement == "" && !online {
+		fmt.Fprintln(os.Stderr, "error: provide --statement <file.xml> (offline) or --flex-token + --flex-query (online)")
+		return 2
+	}
+	if online && (*flexToken == "" || *flexQuery == "") {
+		fmt.Fprintln(os.Stderr, "error: online mode needs both --flex-token and --flex-query")
+		return 2
+	}
+	method, err := gains.ParseMethod(*cgFX)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 2
+	}
+	formats, err := parseFormats(*format)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 2
+	}
+	rateVals := map[string]*big.Rat{}
+	for name, raw := range map[string]string{"marginal-rate": *marginal, "surcharge": *surcharge, "cess": *cess} {
+		v, ok := new(big.Rat).SetString(strings.TrimSpace(raw))
+		if !ok || v.Sign() < 0 {
+			fmt.Fprintf(os.Stderr, "error: --%s %q is not a non-negative percentage\n", name, raw)
+			return 2
+		}
+		rateVals[name] = v
+	}
+
+	period := ibkr.FinancialYear(fyStart)
+	fmt.Printf("itrforeign: Schedule FSI for FY %d-%02d (AY %d-%02d), %s to %s\n",
+		fyStart, (fyStart+1)%100, fyStart+1, (fyStart+2)%100,
+		period.From.Format("2006-01-02"), period.To.Format("2006-01-02"))
+
+	var st *model.Statement
+	if online {
+		fmt.Printf("  source           : Flex Web Service (query %s)\n", *flexQuery)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		body, err := ibkr.NewFlexClient().Fetch(ctx, *flexToken, *flexQuery)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if *saveStmt != "" {
+			if err := os.WriteFile(*saveStmt, body, 0o600); err != nil {
+				fmt.Fprintf(os.Stderr, "error: saving statement to %q: %v\n", *saveStmt, err)
+				return 1
+			}
+			fmt.Printf("  saved statement  : %s\n", *saveStmt)
+		}
+		st, err = ibkr.ParseFlexPeriod(bytes.NewReader(body), period)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	} else {
+		st, err = ibkr.ParseFlexFilePeriod(*statement, period)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	}
+	fmt.Printf("  account          : %s (%s), base %s\n", st.Account.Number, st.Account.Name, st.Account.BaseCurrency)
+	fmt.Printf("  closed lots      : %d\n", len(st.RealizedLots))
+	fmt.Printf("  divs/interest    : %d / %d\n", len(st.Dividends), len(st.Interest))
+	if len(st.RealizedLots) == 0 && len(st.Trades) > 0 {
+		fmt.Fprintln(os.Stderr, "warning: the statement has trades but no CLOSED_LOT detail — capital gains cannot be computed.")
+		fmt.Fprintln(os.Stderr, "hint: in the Flex Query's Trades section, enable Closed Lots (Lot Details).")
+	}
+
+	ratesPath := orDefault(*rates, "data/ttbr")
+	store, err := fx.LoadRateKeeper(ratesPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: loading TTBR rates from %q: %v\n", ratesPath, err)
+		fmt.Fprintln(os.Stderr, "hint: download a RateKeeper CSV (see data/ttbr/README.md) and pass --rates <file|dir>")
+		return 1
+	}
+	fmt.Printf("  rates            : %s\n", ratesPath)
+	ents, err := entities.Load(*entitiesP)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: loading entity metadata from %q: %v\n", *entitiesP, err)
+		return 1
+	}
+
+	rep, err := pipeline.BuildFSI(st, store, fsi.Options{
+		FYStart:      fyStart,
+		TIN:          *tin,
+		MarginalRate: rateVals["marginal-rate"],
+		Surcharge:    rateVals["surcharge"],
+		Cess:         rateVals["cess"],
+		CGMethod:     method,
+		Entities:     ents,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: building Schedule FSI: %v\n", err)
+		return 1
+	}
+
+	paths, err := report.WriteFSI(*out, formats, rep)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: writing report: %v\n", err)
+		return 1
+	}
+
+	review := 0
+	for _, c := range rep.Countries {
+		if c.NeedsReview {
+			review++
+		}
+	}
+	fmt.Printf("  cg fx method     : %s\n", rep.Method)
+	fmt.Printf("  countries        : %d  (%d need manual review)\n", len(rep.Countries), review)
+	fmt.Printf("  relief claimed   : INR %s over %d Schedule TR row(s)\n", rep.TRRelief.FloatString(2), len(rep.TR))
+	fmt.Printf("  wrote            : %s\n", strings.Join(paths, ", "))
+	if rep.TRRelief.Sign() > 0 {
+		fmt.Fprintf(os.Stderr, "\nreminder: Form 67 must be filed to claim this relief — file it with the return.\n")
+	}
+	fmt.Fprintln(os.Stderr, "\n"+disclaimer)
+	return 0
+}
+
+func parseFormats(s string) ([]report.Format, error) {
+	var out []report.Format
+	for _, f := range strings.Split(s, ",") {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		switch report.Format(f) {
+		case report.Markdown, report.CSV, report.JSON, report.HTML:
+			out = append(out, report.Format(f))
+		default:
+			return nil, fmt.Errorf("unknown --format %q (want md,csv,json,html)", f)
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no valid formats in %q", s)
+	}
+	return out, nil
+}
+
+func exactNote(exact bool) string {
+	if exact {
+		return ""
+	}
+	return " (some held days missing prices — A2 peak left as upper bound)"
+}
+
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+// priceTicker is one holding to fetch daily closes for.
+type priceTicker struct {
+	Symbol   string
+	Yahoo    string
+	ISIN     string
+	Currency string
+}
+
+// barFetcher is the subset of *yahoo.Client the fetch-prices command needs;
+// an interface so the fetch loop is testable without hitting the network.
+type barFetcher interface {
+	Chart(ctx context.Context, symbol string, start, end time.Time) ([]yahoo.Bar, error)
+}
+
+// cmdFetchPrices fetches daily closes from Yahoo Finance into the CSV that
+// `generate --prices` expects (columns: date,symbol,isin,close,currency). It
+// writes the RAW (unadjusted) close — the figure Schedule FA wants.
+func cmdFetchPrices(args []string) int {
+	fs := flag.NewFlagSet("fetch-prices", flag.ExitOnError)
+	var (
+		year     = fs.Int("year", 0, "CALENDAR year to fetch prices for (Jan 1 – Dec 31), e.g. 2026")
+		tickersP = fs.String("tickers", "data/prices/tickers.txt", "tickers file: lines of '<symbol> <yahoo-symbol> <isin> [currency]'")
+		out      = fs.String("out", "", "output CSV path (default: data/prices/prices-<year>.csv)")
+	)
+	fs.Parse(args)
+
+	if *year == 0 {
+		fmt.Fprintln(os.Stderr, "error: --year is required (CALENDAR year, e.g. 2026)")
+		return 2
+	}
+	if *year < 2000 || *year > 2099 {
+		fmt.Fprintf(os.Stderr, "error: --year %d is not a plausible calendar year\n", *year)
+		return 2
+	}
+
+	tf, err := os.Open(*tickersP)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: opening tickers file %q: %v\n", *tickersP, err)
+		return 1
+	}
+	defer tf.Close()
+	tickers, err := parsePriceTickers(tf)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: reading tickers file %q: %v\n", *tickersP, err)
+		return 1
+	}
+	if len(tickers) == 0 {
+		fmt.Fprintf(os.Stderr, "error: no tickers in %q\n", *tickersP)
+		return 1
+	}
+
+	outPath := orDefault(*out, filepath.Join("data", "prices", fmt.Sprintf("prices-%d.csv", *year)))
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "error: creating output dir: %v\n", err)
+		return 1
+	}
+	f, err := os.Create(outPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: creating %q: %v\n", outPath, err)
+		return 1
+	}
+	defer f.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	total, err := fetchPricesTo(ctx, yahoo.NewClient(), f, tickers, *year, 500*time.Millisecond)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stderr, "wrote %d rows to %s\n", total, outPath)
+	if total == 0 {
+		return 1
+	}
+	return 0
+}
+
+// parsePriceTickers reads lines of "<symbol> <yahoo-symbol> <isin> [currency]";
+// blank lines and lines beginning with '#' are ignored. Currency defaults to USD.
+func parsePriceTickers(r io.Reader) ([]priceTicker, error) {
+	var out []priceTicker
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 3 {
+			fmt.Fprintf(os.Stderr, "WARN: skipping malformed ticker line: %s\n", line)
+			continue
+		}
+		cur := "USD"
+		if len(parts) > 3 {
+			cur = parts[3]
+		}
+		out = append(out, priceTicker{Symbol: parts[0], Yahoo: parts[1], ISIN: parts[2], Currency: cur})
+	}
+	return out, sc.Err()
+}
+
+// fetchPricesTo fetches each ticker's daily closes for the calendar year and
+// writes CSV rows to w. delay is the pause between tickers (0 to disable). A
+// per-ticker fetch failure is reported to stderr and skipped, not fatal. It
+// returns the number of data rows written.
+func fetchPricesTo(ctx context.Context, f barFetcher, w io.Writer, tickers []priceTicker, year int, delay time.Duration) (int, error) {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"date", "symbol", "isin", "close", "currency"}); err != nil {
+		return 0, err
+	}
+	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+
+	total := 0
+	for i, tk := range tickers {
+		bars, err := f.Chart(ctx, tk.Yahoo, start, end)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARN: %s (%s) failed: %v\n", tk.Symbol, tk.Yahoo, err)
+			continue
+		}
+		for _, b := range bars {
+			if err := cw.Write([]string{b.Date, tk.Symbol, tk.ISIN, strconv.FormatFloat(b.Close, 'f', 4, 64), tk.Currency}); err != nil {
+				return total, err
+			}
+			total++
+		}
+		tag := fmt.Sprintf("%d rows", len(bars))
+		if len(bars) == 0 {
+			tag = "0 rows (check the Yahoo symbol)"
+		}
+		fmt.Fprintf(os.Stderr, "  %s (%s): %s\n", tk.Symbol, tk.Yahoo, tag)
+		if delay > 0 && i < len(tickers)-1 {
+			if err := sleepCtx(ctx, delay); err != nil {
+				return total, err
+			}
+		}
+	}
+	cw.Flush()
+	return total, cw.Error()
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}

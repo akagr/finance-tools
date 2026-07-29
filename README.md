@@ -7,13 +7,13 @@ Indian tax filing and beyond. Each tool is an isolated Go module under its own d
 tied together by a root `go.work` workspace.
 
 > The badge and module paths assume the repo slug `github.com/akagr/finance-tools`; adjust if
-> your remote differs (also in `schedule-fa/go.mod` and `go.work`).
+> your remote differs (also in `itr-foreign/go.mod` and `go.work`).
 
 ## Tools
 
 | Tool            | Directory                      | Status           | What it does                                                                                                                      |
 |-----------------|--------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| **schedule-fa** | [`schedule-fa/`](schedule-fa/) | complete (M0–M8) | Generates ready-to-use **Schedule FA** (Foreign Assets, calendar year) plus **Schedule FSI/TR** (foreign income and tax relief, financial year, Rule 115) and a Form 67 worksheet for the Indian ITR, from **Interactive Brokers (IBKR)** holdings. |
+| **itr-foreign** | [`itr-foreign/`](itr-foreign/) | complete (M0–M8) | Generates ready-to-use **Schedule FA** (Foreign Assets, calendar year) plus **Schedule FSI/TR** (foreign income and tax relief, financial year, Rule 115) and a Form 67 worksheet for the Indian ITR, from **Interactive Brokers (IBKR)** holdings. |
 | **correlation** | [`correlation/`](correlation/) | in progress      | Computes return **correlations** across assets (e.g. VWRA vs Nifty 50) to assess how diversified a portfolio really is.           |
 | **backtest**    | [`backtest/`](backtest/)       | complete         | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs), with walk-forward, parameter sweeps, Monte-Carlo and regime robustness tests. Research only — not advice. |
 | **papertrade**  | [`papertrade/`](papertrade/)   | complete         | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account, equity curve, performance vs benchmark) to validate it before risking capital. No real orders — not advice. |
@@ -23,7 +23,7 @@ tied together by a root `go.work` workspace.
 ```
 finance-tools/
   go.work            # ties all tool modules together
-  schedule-fa/       # each tool: its own go.mod, cmd/, internal/, docs/, data/
+  itr-foreign/       # each tool: its own go.mod, cmd/, internal/, docs/, data/
   …                  # future tools as sibling directories
 ```
 

@@ -1,0 +1,368 @@
+# Schedule FA Generator from IBKR Holdings — Research & Plan
+
+A Go CLI that ingests Interactive Brokers (IBKR) data and produces a ready-to-use
+**Schedule FA** (Foreign Assets) report for the Indian Income Tax Return (ITR-2 / ITR-3).
+
+> **Status:** planning / research. Nothing in `docs/` is tax advice. The generated
+> report is a *working draft* to hand to a CA or to transcribe into the ITR utility —
+> the taxpayer remains responsible for correctness.
+
+---
+
+## 1. What Schedule FA actually requires
+
+Schedule FA is the disclosure of foreign assets that a **Resident and Ordinarily
+Resident (ROR)** individual must file. It is *disclosure*, not taxation — but omission
+carries penalties under the **Black Money (Undisclosed Foreign Income and Assets) Act,
+2015** (penalty up to ₹10 lakh per year), so accuracy matters.
+
+### 1.1 The reporting period is the CALENDAR year, not the financial year
+
+This is the single most important and most error-prone rule.
+
+- For **AY 2025-26 (FY 2024-25)**, Schedule FA covers the **calendar year 1-Jan-2024 to
+  31-Dec-2024** ("the relevant accounting period").
+- "Closing value" = value as on **31-Dec**, not 31-Mar.
+- This mismatch between the FA period (calendar year) and the rest of the ITR (financial
+  year) is a primary source of confusion and the main reason a dedicated tool helps.
+
+### 1.2 Which tables apply to IBKR
+
+| Table                | Title                            | Applies to IBKR?                                                                                          |
+|----------------------|----------------------------------|-----------------------------------------------------------------------------------------------------------|
+| **A2**               | Foreign Custodial Account        | **Yes** — the IBKR brokerage account itself is a custodial account. One row for the account.              |
+| **A3**               | Foreign Equity and Debt Interest | **Yes** — one row **per security** held at any time during the calendar year (stocks, ETFs, RSUs, bonds). |
+| A1                   | Foreign Depository Account       | Only if you hold an IBKR cash/bank-like depository balance (usually report cash under A2).                |
+| D / table for income | Income from foreign sources      | Dividends/interest may also surface here depending on form.                                               |
+
+> **Open design question:** Most filers report each holding in **A3** and *also* report the
+> overall account in **A2**. We must decide whether the tool emits A2, A3, or both.
+> Recommended: emit **both**, with A2 as the account-level summary and A3 as the
+> per-security detail. See §6.
+
+### 1.3 Table A3 columns (per security)
+
+The generator must produce, per security held *at any time* in the calendar year:
+
+1. Country name & **country code** (e.g. United States / 2 — ISO/ITR code list).
+2. Name of entity (issuer, e.g. "Apple Inc").
+3. Address of entity.
+4. ZIP code.
+5. Nature of entity (e.g. "Listed company / ETF").
+6. **Date of acquiring the interest** (first acquisition date of the holding).
+7. **Initial value of the investment** (cost at acquisition), in **INR**.
+8. **Peak value of investment during the period**, in **INR**.
+9. **Closing value** (as on 31-Dec), in **INR**.
+10. **Total gross amount paid/credited** with respect to the holding during the period
+    (i.e. **dividends**), in **INR**.
+11. **Total gross proceeds from sale/redemption** during the period, in **INR**.
+
+### 1.4 Table A2 columns (the account)
+
+Institution name (Interactive Brokers LLC), address, ZIP, country, **account number**,
+status, account opening date, **peak balance**, **closing balance**, and gross
+interest/dividend credited during the period — all in INR.
+
+---
+
+## 2. Currency conversion — the rule that drives the whole design
+
+All values are reported in **INR**, converted using the **SBI TT Buying Rate (TTBR)** —
+the Telegraphic Transfer Buying Rate published by State Bank of India. This is mandated
+(Rule 115 / the FA instructions), **not** optional and **not** the RBI reference rate.
+
+The rate to use depends on the field:
+
+| Field           | Convert using TTBR as on…                                              |
+|-----------------|------------------------------------------------------------------------|
+| Initial value   | date of acquisition of each lot                                        |
+| Peak value      | the date on which the peak (in INR terms) occurred                     |
+| Closing value   | 31-Dec (or last working day with a published rate)                     |
+| Dividend income | date credited (commonly approximated to 31-Dec closing rate; see §5.3) |
+| Sale proceeds   | date of sale                                                           |
+
+**Subtlety:** the peak must be computed in **INR**, i.e. `units × price(USD) × TTBR` on
+each day, and the max taken over the calendar year — *not* the USD peak converted once.
+In practice the USD peak and INR peak usually fall on the same/near date, but they can
+diverge when the rupee moves sharply. The tool should compute it correctly (daily INR
+series) and document the assumption.
+
+---
+
+## 3. Where the data comes from — IBKR
+
+IBKR exposes everything we need through **Flex Queries** and the **Flex Web Service**.
+
+### 3.1 Flex Web Service (programmatic)
+
+Two-step, token-based, XML/CSV over HTTPS (no full OAuth):
+
+1. **SendRequest** — `GET https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendRequest?t=<token>&q=<queryId>&v=3`
+   → returns a numeric **ReferenceCode**.
+2. **GetStatement** — `GET .../FlexWebService/GetStatement?t=<token>&q=<referenceCode>&v=3`
+   → returns the statement (poll until ready; IBKR returns a "generation in progress"
+   code briefly).
+
+The user creates an **Activity Flex Query** in Client Portal and a Flex Web Service
+**token**, then passes both to the tool. We will support **XML output** (cleanest to
+parse) and also accept a **manually downloaded statement file** (offline mode).
+
+### 3.2 Flex Query sections we need
+
+- **Open Positions** (with lots) — for closing holdings at 31-Dec.
+- **Trades / Lots** — acquisition dates and costs; sale proceeds and dates.
+- **Cash Transactions** — **Dividends** and **Payment-in-lieu / Withholding tax**.
+- **Financial Instrument Info** — symbol → issuer name, asset class, ISIN, listing country.
+- **Account Information** — account number, name, base currency, account open date.
+
+> The statement must be pulled for the **calendar year (Jan 1 – Dec 31)**. IBKR statements
+> are date-ranged by request; the tool must enforce the calendar-year window even though
+> the user thinks in financial years.
+
+### 3.3 The hard part: per-day position history for peak value
+
+Open Positions gives you *year-end* holdings. The **peak** needs the value of each
+holding on **every day** it was held. Options:
+
+- **(A) Daily positions Flex Query** — IBKR can emit a daily "Open Positions" snapshot if
+  configured; heavy but exact.
+- **(B) Reconstruct positions from trades** — start from year-open position (from prior
+  year statement or the Jan-1 snapshot) and walk trades forward to get a daily share-count
+  series, then multiply by a daily price series. Needs an external price source.
+- **(C) Approximate** — peak ≈ max(closing value, max trade-day value). Cheap, defensible
+  for buy-and-hold, but **not exact** and must be clearly labelled.
+
+**Recommendation:** Start with **(B)** for share counts (deterministic from IBKR data) +
+a pluggable **daily price provider**; fall back to **(C)** with a visible warning when
+prices are unavailable. See §5 challenges.
+
+---
+
+## 4. The other hard part: SBI TTBR historical rates
+
+There is **no official free SBI TTBR API**. SBI publishes a daily "FOREX CARD RATES" PDF;
+historical archives are not cleanly downloadable. **Decision (M2):** consume the
+community-maintained **SBI FX RateKeeper** dataset
+([sahilgupta/sbi-fx-ratekeeper](https://github.com/sahilgupta/sbi-fx-ratekeeper)) — daily
+per-currency CSVs back to ~Jan 2020, with the source PDF linked per row for verification.
+
+- **Format:** RateKeeper per-currency CSV (`DATE`, `TT BUY`, …); currency from the
+  filename. See [`data/ttbr/README.md`](../data/ttbr/README.md).
+- **Not bundled:** the data is third-party and updated daily, so it is downloaded into
+  `data/ttbr/` (gitignored if it contains a fork) rather than vendored. The user points
+  `--rates` at a file or directory.
+- **Non-publish days:** a `TT BUY` of `0.00` is treated as "no rate"; combined with the
+  **preceding-working-day fallback** in `RateOn`, the nearest earlier published rate is used
+  and `Conversion.RateDate` records which date actually applied.
+- A best-effort fetcher/updater can come later as a *separate* concern, kept out of the
+  core path so a broken upstream never blocks report generation.
+
+This is the component most likely to need manual review by the user, so the report must
+show **the rate and date used for every converted figure** (audit trail), not just the
+final INR number.
+
+---
+
+## 5. Challenges & risks (ranked)
+
+1. **Peak value computation** (§3.3) — needs daily position × daily price × daily TTBR.
+   Biggest source of inaccuracy. Mitigation: reconstruct shares from trades; pluggable
+   price source; explicit approximation mode with warnings.
+2. **SBI TTBR historical data** (§4) — no official API. Mitigation: bundled + user CSV +
+   preceding-working-day fallback + full audit trail.
+3. **Calendar-year vs financial-year** (§1.1) — easy to get wrong silently. Mitigation:
+   the tool takes a *calendar year* as input and refuses FY-shaped ranges.
+4. **Lot / cost-basis accuracy** — acquisition date & "initial value" per holding;
+   multiple lots, partial sales, FIFO. Mitigation: consume IBKR lot data directly rather
+   than recomputing FIFO where possible.
+5. **Corporate actions** — splits, symbol changes, mergers, spin-offs, stock dividends
+   distort share counts and cost basis. Mitigation: consume IBKR's CorporateActions
+   section; flag anything unrecognised for manual review.
+6. **RSUs / vesting / ESPP** — "date of acquiring interest" = vesting date; cost basis
+   nuances. Often the actual user need. Mitigation: handle vesting events as acquisitions.
+7. **Dividend gross vs net of withholding tax** — Schedule FA wants **gross** dividend.
+   IBKR shows the dividend and the 25% US withholding separately. Mitigation: sum gross,
+   keep withholding visible (also relevant for Schedule TR / FTC, out of scope for v1).
+8. **Entity metadata** (issuer address, ZIP, nature, country code) — IBKR gives symbol &
+   ISIN but not a tidy address. Mitigation: maintain a small reference table keyed by
+   ISIN/symbol; default US exchange-listed → United States; allow user overrides.
+9. **Closing value source** — 31-Dec mark price. IBKR statement carries year-end mark;
+   for mid-year-exited positions closing value is 0 (but they still appear in A3 with
+   peak + proceeds). Mitigation: include exited positions; closing = 0.
+10. **Multiple accounts / joint holdings / base currency ≠ USD** — Mitigation: per-account
+    processing; convert from each instrument's currency, not just USD.
+11. **Not tax advice / liability** — Mitigation: prominent disclaimers; audit trail so a
+    professional can verify every number.
+
+---
+
+## 6. Output
+
+- **Human-readable report**: a printable table (Markdown/HTML/PDF) laid out exactly like
+  Schedule FA Table A2 and A3, in INR, **with a companion audit sheet** showing the
+  USD figure, the TTBR, and the rate date behind every INR value.
+- **Machine-readable**: CSV/JSON matching the ITR utility's import schema where one
+  exists, so values can be pasted/imported into the income-tax e-filing utility.
+- **Reconciliation summary**: totals, count of holdings, any rows flagged for manual
+  review (corporate actions, missing prices, missing rates).
+
+---
+
+## 7. Proposed architecture (Go)
+
+```
+finance-tools/
+  cmd/itrforeign/        # CLI entrypoint (stdlib flag + subcommand router; no external deps in v1)
+  internal/
+    ibkr/                # Flex Web Service client + XML statement parser
+    model/               # domain types: Account, Lot, Trade, Dividend, Holding
+    fx/                  # TTBR rate store, lookup w/ preceding-day fallback
+    prices/              # daily price provider interface + impls (IBKR-derived, external)
+    peak/                # daily position reconstruction + peak value engine
+    fa/                  # build Schedule FA A2/A3 rows from holdings + fx
+    report/              # renderers: markdown, csv, json, (later) pdf/html
+  data/
+    ttbr/                # bundled historical SBI TTBR CSVs
+    entities/            # ISIN/symbol -> issuer name, address, country code
+  docs/
+    itr-foreign-plan.md  # this file
+```
+
+### Data flow
+
+```
+IBKR Flex (XML)  ──parse──▶  model.{Trades, Positions, Dividends, Account}
+                                   │
+        ┌──────────────────────────┼─────────────────────────────┐
+        ▼                          ▼                              ▼
+ peak: daily shares × price   acquisition lots            dividends (gross)
+        │                          │                              │
+        └────────── fx (TTBR by date, INR) ────────────────────────┘
+                                   │
+                                   ▼
+                    fa.Build → A2 + A3 rows (INR + audit)
+                                   │
+                                   ▼
+                 report: markdown / csv / json (+ audit sheet)
+```
+
+### CLI sketch
+
+```
+itrforeign fa \
+  --year 2024 \                       # CALENDAR year (enforced)
+  --flex-token <t> --flex-query <q> \ # OR --statement statement.xml
+  --rates data/ttbr/usd-2024.csv \    # optional override
+  --prices prices-2024.csv \          # optional daily prices for exact peak
+  --out report/ --format md,csv,json
+```
+
+---
+
+## 8. Milestones
+
+- **M0 — Skeleton:** ✅ repo, CLI scaffold, domain model, disclaimers.
+- **M1 — IBKR ingest:** ✅ parse a downloaded Activity Flex **XML** (offline): account,
+  open positions (+ lot detail), trades, dividends (with withholding matched), securities
+  info. Year-constrained. Tolerant decode + flexible date parsing. Test in
+  `internal/ibkr/ibkr_test.go` against `testdata/sample_flex.xml`; `generate` prints a
+  parse summary.
+- **M2 — FX engine:** ✅ `fx.CSVStore` loads the community SBI FX RateKeeper format
+  (per-currency CSV; reads DATE + TT BUY; skips 0.00 non-publish days; latest-of-day wins).
+  `RateOn` does preceding-working-day fallback; `Convert` emits `Conversion` audit records.
+  Tested in `internal/fx/fx_test.go`.
+- **M3 — A3 (buy & hold):** ✅ `peak.Compute` (mode C) + `fa.Build` produce Table A3
+  rows (initial/peak/closing/dividend/proceeds in INR, per-figure audit, review flags);
+  `report` renders md/csv/json with an audit trail + reconciliation. `generate` runs the
+  full pipeline end-to-end. Conversion-date conventions documented in `build.go`.
+- **M4 — Exact peak:** ✅ `peak.ComputeExact` (mode B) reconstructs a daily share series and
+  values it against a daily price series (`prices.CSVStore`, preceding-trading-day fallback)
+  × TTBR, maximising INR. Also returns the **true Table A2 peak** (max daily NAV).
+  `--prices` selects mode B; mode C remains the labelled fallback. Splits not auto-adjusted
+  (flagged via corporate actions).
+- **M5 — A2 + edge cases:** ✅ Table A2 custodial-account row (aggregates A3; account peak
+  is a flagged upper bound, cash excluded); `entities` metadata package (CSV override for
+  address/ZIP/country code/nature, via `--entities`); RSU vesting date as acquisition date;
+  corporate-action parsing + review flags; richer AccountInformation (address, ibEntity).
+  Review flags now trip only on real data gaps. A2 rendered in md/json.
+- **M6 — Flex Web Service:** ✅ `ibkr.FlexClient` does the online pull
+  (SendRequest → poll GetStatement, handling the 1019 "generating" code). `generate`
+  accepts `--flex-token` + `--flex-query` (with `--save-statement` to keep the raw XML).
+  Tested with an httptest fake server (poll-then-success, error, missing-creds).
+- **M8 — Schedule FSI + TR:** ✅ the income side of the same statement. `ibkr` gained
+  period-based ingest (`Period`, `FinancialYear`) plus the sections FA never needed —
+  `CLOSED_LOT`/nested `<Lot>` realized-gain detail, interest, payments in lieu, and withholding
+  that matches no distribution (previously documented as emitted but actually dropped, which
+  would have forfeited the credit). New packages: `rule115` (Rule 115 specified dates and
+  Rule 128(8), reusing the fx store's preceding-working-day fallback for month ends),
+  `gains` (24-month term, 23-Jul-2024 rate split, per-leg vs net-gain FX, cross-checked against
+  IBKR's `fifoPnlRealized`), `fsi` (the country × head grid, Schedule TR, Form 67 worksheet,
+  Schedule CG/OS tie-out) and `itr` (the ITR country-code list, shared with FA). Renders md/csv/
+  json/html (the HTML sharing its stylesheet with the FA report, so the two print as one pack)
+  plus a fragment in the ITD ITR-2 schema's own field names, which is validated against
+  that schema. Column (d) comes from explicit `--marginal-rate`/`--surcharge`/`--cess`
+  assumptions, never a silent guess.
+
+  Bug found while researching it: the ITR country code for the US is **2**, not 1 (Canada is 1;
+  the ITD list disambiguates the shared ISD +1). FA had been emitting 1, which the offline
+  utility's schema enum rejects. Fixed, and the table now lives in `internal/itr` so the two
+  schedules cannot drift apart.
+
+- **M7 — Renderers & UX:** ✅ printable self-contained HTML renderer (`--format html`;
+  Print → Save as PDF), sharing a view model with JSON. Reconciliation summary in md/html.
+  Fool-proof IBKR setup guide (Flex Query, Query ID, token) in the README. PDF is via the
+  browser's print-to-PDF, keeping the tool dependency-free.
+
+---
+
+## 9. Decisions — LOCKED (2026-06-14)
+
+1. **Emit both A2 and A3.** A2 = account-level custodial summary, A3 = per-security detail.
+2. **Peak: approximate (mode C) for v1**, exact daily reconstruction (mode B) in M4. Mode C
+   output is always labelled "approximate" with a manual-review flag.
+3. **Offline downloaded statement (XML) first**; Flex Web Service online pull deferred to M6.
+4. ~~**Scope = Schedule FA only for v1.**~~ **Superseded in M8:** Schedule FSI/TR now ships in
+   the same module as a second command. The reuse bet paid off — `fx`, `model` and `ibkr` were
+   shared as designed — but FSI lives *inside* `itr-foreign/` rather than in its own module,
+   because the repo's isolated-module convention would have meant hand-syncing copies of three
+   substantial packages, and because both schedules read the same Flex statement (which is what
+   makes the FA↔FSI tie-out possible at all).
+5. **USD-first**, but `Currency` is plumbed through every value and the `fx` store is
+   keyed by currency from day one, so adding EUR/GBP/etc. is data-only, not code.
+
+### Repo shape (locked)
+
+This repo is a **monorepo of tax tools**. Each tool is an isolated Go module under its own
+top-level directory, tied together by a root `go.work`:
+
+```
+finance-tools/
+  go.work                 # workspace tying all tool modules together
+  README.md               # repo index
+  itr-foreign/            # THIS tool (module github.com/akagr/finance-tools/itr-foreign)
+    go.mod
+    docs/  cmd/  internal/  data/
+  <future-tool>/          # e.g. schedule-cg/, form-67/ …
+```
+
+> Module path `github.com/akagr/finance-tools/itr-foreign` is a placeholder derived from the
+> account name; change it in `go.mod` + `go.work` if the real remote differs.
+
+---
+
+## 10. Sources
+
+- [Schedule FA (Foreign Assets) Disclosure in ITR — Quicko](https://learn.quicko.com/schedule-foreign-assets-in-income-tax-return)
+- [Understanding Schedule FA — Taxmann](https://www.taxmann.com/post/blog/understanding-schedule-fa-guide-on-disclosing-foreign-assets-income-in-itr-filing-for-indian-residents/)
+- [Schedule FA under the Black Money Law — Taxmann](https://www.taxmann.com/post/blog/understand-schedule-fa-in-itr-forms-and-implications-under-the-black-money-law/)
+- [Resident Indians Holding U.S. Stocks — ClearTax](https://cleartax.in/s/resident-indians-should-disclose-us-stocks-in-itr)
+- [Schedule FA disclosure — Tax2win](https://tax2win.in/guide/schedule-fa-disclosure-of-foreign-assets-in-itr)
+- [Schedule FA step-by-step AY 2025-26 — Endovia Wealth](https://www.endoviawealth.com/how-to-declare-foreign-assets-in-itr-schedule-fa-step-by-step-guide-ay-2025-26/)
+- [What the SBI TTBR rate is — Rovia](https://www.rovia.one/resources/taxation/what-the-sbi-ttbr-rate-is-and-why-it-matters-for-your-taxes)
+- [SBI TTBR rate explained — Paasa](https://paasa.com/blog/sbi-ttbr-rate-explained)
+- [Flex Web Service — IBKR Campus](https://www.interactivebrokers.com/campus/ibkr-api-page/flex-web-service/)
+- [Flex Web Service Version 3 — IBKR docs](https://www.ibkrguides.com/complianceportal/complianceportal/flexweb3.htm)
+- [Flex Query Output Format — IBKR Campus](https://www.interactivebrokers.com/campus/glossary-terms/flex-query-output-format/)
+- [IBKR Flex Query Setup — TrackYourPortfol.io](https://trackyourportfol.io/blog/ibkr-flex-query-setup)
+</content>
+</invoke>

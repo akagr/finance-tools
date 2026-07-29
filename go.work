@@ -1,7 +1,7 @@
 go 1.26
 
 use (
-	./schedule-fa
+	./itr-foreign
 	./correlation
 	./backtest
 	./papertrade
