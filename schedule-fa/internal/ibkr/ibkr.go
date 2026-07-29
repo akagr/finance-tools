@@ -5,9 +5,12 @@
 //
 // The parser is deliberately tolerant: encoding/xml ignores unknown elements and
 // attributes, dates are parsed across the formats Flex can emit, and records are
-// constrained to the requested calendar year. Sections consumed:
-// AccountInformation, OpenPositions (with optional Lot detail), Trades,
-// CashTransactions (dividends + withholding), SecuritiesInfo.
+// constrained to the requested reporting period (a calendar year for Schedule
+// FA, an Apr–Mar financial year for the income schedules). Sections consumed:
+// AccountInformation, OpenPositions (with optional Lot detail), Trades
+// (executions plus CLOSED_LOT / nested <Lot> realized-gain detail),
+// CashTransactions (dividends, payments in lieu, interest and withholding),
+// CorporateActions, SecuritiesInfo.
 package ibkr
 
 import (
@@ -24,18 +27,65 @@ import (
 
 // ParseFlexFile parses an IBKR Activity Flex XML file, constrained to `year`.
 func ParseFlexFile(path string, year int) (*model.Statement, error) {
+	return ParseFlexFilePeriod(path, CalendarYear(year))
+}
+
+// ParseFlexFilePeriod parses an IBKR Activity Flex XML file, constrained to an
+// arbitrary reporting period (e.g. an Apr–Mar financial year).
+func ParseFlexFilePeriod(path string, p Period) (*model.Statement, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return ParseFlexXML(f, year)
+	return ParseFlexPeriod(f, p)
+}
+
+// Period is an inclusive reporting window. Schedule FA uses a calendar year;
+// the income schedules (FSI/TR/CG/OS) use the Apr–Mar financial year.
+type Period struct {
+	From time.Time
+	To   time.Time
+}
+
+// CalendarYear returns the Jan 1 – Dec 31 period for a calendar year.
+func CalendarYear(year int) Period {
+	return Period{
+		From: time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC),
+		To:   time.Date(year, time.December, 31, 23, 59, 59, 0, time.UTC),
+	}
+}
+
+// FinancialYear returns the Apr 1 – Mar 31 period for the FY starting in
+// `startYear` (e.g. 2025 for FY 2025-26, i.e. AY 2026-27).
+func FinancialYear(startYear int) Period {
+	return Period{
+		From: time.Date(startYear, time.April, 1, 0, 0, 0, 0, time.UTC),
+		To:   time.Date(startYear+1, time.March, 31, 23, 59, 59, 0, time.UTC),
+	}
+}
+
+// calendarYear reports the calendar year the period covers exactly, or 0.
+func (p Period) calendarYear() int {
+	if p.From.Month() == time.January && p.From.Day() == 1 &&
+		p.To.Month() == time.December && p.To.Day() == 31 &&
+		p.From.Year() == p.To.Year() {
+		return p.From.Year()
+	}
+	return 0
 }
 
 // ParseFlexXML reads an IBKR Activity Flex Query (XML output) and returns the
 // statement with all dated records constrained to `year` (1 Jan – 31 Dec).
 // Open positions are the year-end snapshot and are kept as-is.
 func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
+	return ParseFlexPeriod(r, CalendarYear(year))
+}
+
+// ParseFlexPeriod reads an IBKR Activity Flex Query (XML output) and returns the
+// statement with all dated records constrained to the period. Open positions are
+// the end-of-period snapshot and are kept as-is.
+func ParseFlexPeriod(r io.Reader, period Period) (*model.Statement, error) {
 	var resp flexResponse
 	dec := xml.NewDecoder(r)
 	if err := dec.Decode(&resp); err != nil {
@@ -45,13 +95,12 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 		return nil, fmt.Errorf("ibkr: no FlexStatement found (check the query has sections enabled)")
 	}
 
-	yearStart := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
-	yearEnd := time.Date(year, time.December, 31, 23, 59, 59, 0, time.UTC)
+	yearStart, yearEnd := period.From, period.To
 	inYear := func(t time.Time) bool {
 		return !t.IsZero() && !t.Before(yearStart) && !t.After(yearEnd)
 	}
 
-	out := &model.Statement{Year: year}
+	out := &model.Statement{Year: period.calendarYear(), From: yearStart, To: yearEnd}
 	instruments := map[string]model.Instrument{} // keyed by isin|symbol
 
 	for _, st := range resp.Statements.Statement {
@@ -187,6 +236,16 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 				AssetClass: t.AssetCategory, ListingCtry: t.IssuerCountryCode,
 				Currency: model.Currency(t.Currency),
 			})
+			// A CLOSED_LOT row is IBKR's per-lot breakdown of a closing trade,
+			// not a separate execution — counting it as a trade would double the
+			// proceeds. It is the capital-gains input instead.
+			if strings.EqualFold(t.LevelOfDetail, "CLOSED_LOT") {
+				out.RealizedLots = append(out.RealizedLots, closedLot(inst, d, t.Currency,
+					t.Quantity, t.Proceeds, firstNonEmpty(t.Cost, t.CostBasis, t.CostBasisMoney),
+					t.IBCommission, t.FifoPnlRealized,
+					firstNonEmpty(t.HoldingPeriodDateTime, t.OpenDateTime)))
+				continue
+			}
 			out.Trades = append(out.Trades, model.Trade{
 				Instrument: inst,
 				Date:       d,
@@ -196,12 +255,22 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 				Proceeds:   money(t.Currency, t.Proceeds), // IBKR-signed: negative for buys
 				Commission: money(t.Currency, t.IBCommission),
 			})
+			// Flex can instead nest the closed-lot breakdown inside the trade.
+			for _, l := range t.Lots {
+				out.RealizedLots = append(out.RealizedLots, closedLot(inst, d, t.Currency,
+					l.Quantity, l.Proceeds, firstNonEmpty(l.Cost, l.CostBasis, l.CostBasisMoney),
+					l.IBCommission, l.FifoPnlRealized,
+					firstNonEmpty(l.HoldingPeriodDateTime, l.OpenDateTime)))
+			}
 		}
 
-		// Cash transactions → dividends (income) and withholding, within the year.
-		// Withholding rows are matched to a same-instrument, same-day dividend;
-		// any unmatched withholding is emitted as its own row for completeness.
+		// Cash transactions → dividends, payments in lieu, interest and
+		// withholding, within the year. Withholding rows are matched to a
+		// same-instrument, same-day dividend; anything left over is kept as an
+		// unattributed withholding rather than dropped — it is still a
+		// creditable foreign tax, and discarding it forfeits the credit.
 		var pending []model.Dividend
+		var pendingWH []model.Withholding
 		withheld := map[string]*big.Rat{}
 		for _, c := range st.CashTransactions.Txns {
 			d := mustDate(firstNonEmpty(c.DateTime, c.SettleDate))
@@ -213,16 +282,38 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 				Currency: model.Currency(c.Currency),
 			})
 			switch classify(c.Type) {
-			case txnDividend:
+			case txnDividend, txnPaymentInLieu:
+				kind := model.DividendCash
+				if classify(c.Type) == txnPaymentInLieu {
+					kind = model.DividendInLieu
+				}
 				pending = append(pending, model.Dividend{
 					Instrument:  inst,
 					PayDate:     d,
 					Gross:       money(c.Currency, c.Amount),
 					Withholding: model.NewMoney(model.Currency(c.Currency), nil),
+					Kind:        kind,
+				})
+			case txnInterest:
+				out.Interest = append(out.Interest, model.Interest{
+					Instrument:  inst,
+					Date:        d,
+					Amount:      money(c.Currency, c.Amount), // signed: paid interest is negative
+					Withholding: model.NewMoney(model.Currency(c.Currency), nil),
+					Description: firstNonEmpty(c.Description, c.Type),
 				})
 			case txnWithholding:
+				// IBKR posts withholding as a debit (negative). Negating rather
+				// than taking the absolute value lets a later reversal/refund
+				// row (positive) correctly net the tax down.
 				k := instKey(c.ISIN, c.Symbol) + "|" + d.Format("20060102")
-				withheld[k] = new(big.Rat).Add(orZero(withheld[k]), absRat(parseRat(c.Amount)))
+				withheld[k] = new(big.Rat).Add(orZero(withheld[k]), negRat(parseRat(c.Amount)))
+				pendingWH = append(pendingWH, model.Withholding{
+					Instrument:  inst,
+					Date:        d,
+					Amount:      model.NewMoney(model.Currency(c.Currency), negRat(parseRat(c.Amount))),
+					Description: firstNonEmpty(c.Description, c.Type),
+				})
 			}
 		}
 		for i := range pending {
@@ -230,6 +321,12 @@ func ParseFlexXML(r io.Reader, year int) (*model.Statement, error) {
 			if w, ok := withheld[k]; ok {
 				pending[i].Withholding = model.NewMoney(pending[i].Gross.Currency, w)
 				delete(withheld, k)
+			}
+		}
+		for _, w := range pendingWH {
+			k := instKey(w.Instrument.ISIN, w.Instrument.Symbol) + "|" + w.Date.Format("20060102")
+			if _, unmatched := withheld[k]; unmatched {
+				out.UnmatchedWithholding = append(out.UnmatchedWithholding, w)
 			}
 		}
 		out.Dividends = append(out.Dividends, pending...)
@@ -360,6 +457,28 @@ type flexTrade struct {
 	Proceeds          string `xml:"proceeds,attr"`
 	IBCommission      string `xml:"ibCommission,attr"`
 	IssuerCountryCode string `xml:"issuerCountryCode,attr"`
+	// Closed-lot detail (levelOfDetail="CLOSED_LOT", or nested <Lot> rows).
+	LevelOfDetail         string          `xml:"levelOfDetail,attr"`
+	Cost                  string          `xml:"cost,attr"`
+	CostBasis             string          `xml:"costBasis,attr"`
+	CostBasisMoney        string          `xml:"costBasisMoney,attr"`
+	FifoPnlRealized       string          `xml:"fifoPnlRealized,attr"`
+	OpenDateTime          string          `xml:"openDateTime,attr"`
+	HoldingPeriodDateTime string          `xml:"holdingPeriodDateTime,attr"`
+	Lots                  []flexClosedLot `xml:"Lot"`
+}
+
+// flexClosedLot is the per-lot breakdown Flex nests inside a closing trade.
+type flexClosedLot struct {
+	Quantity              string `xml:"quantity,attr"`
+	Proceeds              string `xml:"proceeds,attr"`
+	Cost                  string `xml:"cost,attr"`
+	CostBasis             string `xml:"costBasis,attr"`
+	CostBasisMoney        string `xml:"costBasisMoney,attr"`
+	IBCommission          string `xml:"ibCommission,attr"`
+	FifoPnlRealized       string `xml:"fifoPnlRealized,attr"`
+	OpenDateTime          string `xml:"openDateTime,attr"`
+	HoldingPeriodDateTime string `xml:"holdingPeriodDateTime,attr"`
 }
 
 type flexCashTxn struct {
@@ -401,7 +520,9 @@ type txnKind int
 const (
 	txnOther txnKind = iota
 	txnDividend
+	txnPaymentInLieu
 	txnWithholding
+	txnInterest
 )
 
 func classify(t string) txnKind {
@@ -409,10 +530,33 @@ func classify(t string) txnKind {
 	switch {
 	case strings.Contains(s, "withholding"):
 		return txnWithholding
-	case strings.Contains(s, "dividend"), strings.Contains(s, "payment in lieu"):
+	case strings.Contains(s, "in lieu"):
+		// A substitute payment on lent-out shares: a credit like a dividend, but
+		// withheld at the US statutory 30% with no treaty rate.
+		return txnPaymentInLieu
+	case strings.Contains(s, "dividend"):
 		return txnDividend
+	case strings.Contains(s, "interest"):
+		return txnInterest
 	default:
 		return txnOther
+	}
+}
+
+// closedLot builds a RealizedLot from IBKR's own FIFO lot-closing detail.
+// Quantity, cost and proceeds are stored as positive magnitudes; the reported
+// fifoPnlRealized is retained so the gains engine can cross-check the
+// arithmetic (and so short covers, whose signs invert, get flagged).
+func closedLot(inst model.Instrument, closeDate time.Time, cur, qty, proceeds, cost, commission, pnl, openDate string) model.RealizedLot {
+	return model.RealizedLot{
+		Instrument:  inst,
+		OpenDate:    mustDate(openDate),
+		CloseDate:   closeDate,
+		Quantity:    absRat(parseRat(qty)),
+		Cost:        model.NewMoney(model.Currency(cur), absRat(parseRat(cost))),
+		Proceeds:    model.NewMoney(model.Currency(cur), absRat(parseRat(proceeds))),
+		Commission:  money(cur, commission),
+		RealizedPnL: money(cur, pnl),
 	}
 }
 
@@ -477,6 +621,10 @@ func parseRat(s string) *big.Rat {
 
 func absRat(r *big.Rat) *big.Rat {
 	return new(big.Rat).Abs(r)
+}
+
+func negRat(r *big.Rat) *big.Rat {
+	return new(big.Rat).Neg(r)
 }
 
 func orZero(r *big.Rat) *big.Rat {

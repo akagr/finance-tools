@@ -1,0 +1,94 @@
+{
+  "_note": "Schedule FSI/TR fragment in the ITD ITR-2 schema's field names, whole rupees. Not a complete ITR JSON, and the utility cannot import a single schedule. Not tax advice. A working draft to verify before filing. Schedule FSI covers the FINANCIAL year and converts under Rule 115 — it is NOT comparable figure-for-figure with Schedule FA.",
+  "ScheduleFSI": {
+    "ScheduleFSIDtls": [
+      {
+        "CountryName": "United States of America",
+        "CountryCodeExcludingIndia": "2",
+        "TaxIdentificationNo": "XXXXX1234X",
+        "IncFromSal": {
+          "IncFrmOutsideInd": 0,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 0,
+          "TaxReliefinInd": 0
+        },
+        "IncFromHP": {
+          "IncFrmOutsideInd": 0,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 0,
+          "TaxReliefinInd": 0
+        },
+        "IncCapGain": {
+          "IncFrmOutsideInd": 91779,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 13047,
+          "TaxReliefinInd": 0
+        },
+        "IncOthSrc": {
+          "IncFrmOutsideInd": 6774,
+          "TaxPaidOutsideInd": 1407,
+          "TaxPayableinInd": 2114,
+          "TaxReliefinInd": 1407,
+          "DTAAReliefUs90or90A": "10"
+        },
+        "TotalCountryWise": {
+          "IncFrmOutsideInd": 98554,
+          "TaxPaidOutsideInd": 1407,
+          "TaxPayableinInd": 15161,
+          "TaxReliefinInd": 1407
+        }
+      },
+      {
+        "CountryName": "Ireland",
+        "CountryCodeExcludingIndia": "353",
+        "TaxIdentificationNo": "XXXXX1234X",
+        "IncFromSal": {
+          "IncFrmOutsideInd": 0,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 0,
+          "TaxReliefinInd": 0
+        },
+        "IncFromHP": {
+          "IncFrmOutsideInd": 0,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 0,
+          "TaxReliefinInd": 0
+        },
+        "IncCapGain": {
+          "IncFrmOutsideInd": 12991,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 1689,
+          "TaxReliefinInd": 0
+        },
+        "IncOthSrc": {
+          "IncFrmOutsideInd": 1573,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 491,
+          "TaxReliefinInd": 0
+        },
+        "TotalCountryWise": {
+          "IncFrmOutsideInd": 14564,
+          "TaxPaidOutsideInd": 0,
+          "TaxPayableinInd": 2180,
+          "TaxReliefinInd": 0
+        }
+      }
+    ]
+  },
+  "ScheduleTR1": {
+    "ScheduleTR": [
+      {
+        "CountryName": "United States of America",
+        "CountryCodeExcludingIndia": "2",
+        "TaxIdentificationNo": "XXXXX1234X",
+        "TaxPaidOutsideIndia": 1407,
+        "TaxReliefOutsideIndia": 1407,
+        "ReliefClaimedUsSection": "90"
+      }
+    ],
+    "TotalTaxPaidOutsideIndia": 1407,
+    "TotalTaxReliefOutsideIndia": 1407,
+    "TaxReliefOutsideIndiaDTAA": 1407,
+    "TaxReliefOutsideIndiaNotDTAA": 0
+  }
+}

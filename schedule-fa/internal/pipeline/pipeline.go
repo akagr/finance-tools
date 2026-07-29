@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"github.com/akagr/finance-tools/schedule-fa/internal/entities"
+	"github.com/akagr/finance-tools/schedule-fa/internal/fsi"
 	"github.com/akagr/finance-tools/schedule-fa/internal/fx"
 	"github.com/akagr/finance-tools/schedule-fa/internal/model"
 	"github.com/akagr/finance-tools/schedule-fa/internal/peak"
@@ -18,7 +19,16 @@ type Result struct {
 	A2PeakExact bool // the portfolio peak was computed exactly (all held days priced)
 }
 
-// BuildReport computes peaks and assembles Tables A2/A3. If prices is non-nil it
+// BuildFSI is the orchestration seam for the income schedules: compute capital
+// gains and other-source income from a statement parsed over the FINANCIAL year,
+// then assemble Schedules FSI and TR. It is deliberately separate from
+// BuildReport — Schedule FA and Schedule FSI share ingest and FX data but
+// nothing else, because they run on different periods under different
+// conversion rules.
+func BuildFSI(st *model.Statement, store fx.Store, opts fsi.Options) (*fsi.Report, error) {
+	return fsi.Build(st, store, opts)
+}
+
 // uses the exact daily engine (mode B) and a true portfolio peak; otherwise the
 // approximate engine (mode C). ents may be nil.
 func BuildReport(st *model.Statement, store fx.Store, prices peak.PriceProvider, ents *entities.Store) (*Result, error) {

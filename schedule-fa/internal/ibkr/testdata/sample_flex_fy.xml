@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetic Activity Flex export for the INCOME schedules: FY 2025-26
+  (1 Apr 2025 – 31 Mar 2026), i.e. AY 2026-27. No real data.
+
+  It deliberately exercises the awkward cases:
+    - a sell broken into CLOSED_LOT rows, one long-term (held > 24 months) and
+      one short-term, alongside the EXECUTION row that must NOT be double counted
+    - an Irish-domiciled UCITS ETF listed in the US, so the source country is
+      Ireland (353) and not the listing venue
+    - a dividend with 25% US withholding, and an Irish distribution with none
+    - a payment in lieu of dividend (shares on loan), withheld at 30%
+    - a withholding row that matches no distribution
+    - broker interest received and interest paid
+    - a distribution just outside the financial year, which must be dropped
+-->
+<FlexQueryResponse queryName="ScheduleFSI" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U1234567" fromDate="20250401" toDate="20260331" period="Custom" whenGenerated="20260415;120000">
+      <AccountInformation accountId="U1234567" name="Jane Doe" currency="USD" dateOpened="20210510" ibEntity="IBLLC-US" street="12 Market St" city="Mumbai" state="MH" country="IN" postalCode="400001"/>
+      <SecuritiesInfo>
+        <SecurityInfo symbol="AAPL" isin="US0378331005" description="APPLE INC" assetCategory="STK" currency="USD" issuerCountryCode="US"/>
+        <SecurityInfo symbol="VWRA" isin="IE00BK5BQT80" description="VANGUARD FTSE ALL-WORLD UCITS ETF" assetCategory="ETF" currency="USD" issuerCountryCode="IE"/>
+        <SecurityInfo symbol="MSFT" isin="US5949181045" description="MICROSOFT CORP" assetCategory="STK" currency="USD" issuerCountryCode="US"/>
+      </SecuritiesInfo>
+      <OpenPositions>
+        <OpenPosition accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" position="15" markPrice="245.00" costBasisPrice="150.00" costBasisMoney="2250.00" openDateTime="20220510;120000" holdingPeriodDateTime="20220510;120000" issuerCountryCode="US" levelOfDetail="SUMMARY"/>
+      </OpenPositions>
+      <Trades>
+        <!-- One sale of 15 AAPL, broken into two closed lots. -->
+        <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" tradeDate="20250820" buySell="SELL" quantity="-15" tradePrice="230.00" proceeds="3450.00" ibCommission="-1.50" issuerCountryCode="US" levelOfDetail="EXECUTION"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" tradeDate="20250820" buySell="SELL" quantity="-10" tradePrice="230.00" proceeds="2300.00" ibCommission="-1.00" cost="1500.00" fifoPnlRealized="799.00" openDateTime="20220510;120000" holdingPeriodDateTime="20220510;120000" issuerCountryCode="US" levelOfDetail="CLOSED_LOT"/>
+        <Trade accountId="U1234567" assetCategory="STK" symbol="AAPL" isin="US0378331005" description="APPLE INC" currency="USD" tradeDate="20250820" buySell="SELL" quantity="-5" tradePrice="230.00" proceeds="1150.00" ibCommission="-0.50" cost="1100.00" fifoPnlRealized="49.50" openDateTime="20250115;120000" holdingPeriodDateTime="20250115;120000" issuerCountryCode="US" levelOfDetail="CLOSED_LOT"/>
+        <!-- An Irish UCITS ETF sold long-term, with the lot detail nested. -->
+        <Trade accountId="U1234567" assetCategory="ETF" symbol="VWRA" isin="IE00BK5BQT80" description="VANGUARD FTSE ALL-WORLD UCITS ETF" currency="USD" tradeDate="20260210" buySell="SELL" quantity="-4" tradePrice="130.00" proceeds="520.00" ibCommission="-1.00" issuerCountryCode="IE" levelOfDetail="EXECUTION">
+          <Lot quantity="-4" proceeds="520.00" cost="400.00" ibCommission="-1.00" fifoPnlRealized="119.00" openDateTime="20231120;120000" holdingPeriodDateTime="20231120;120000"/>
+        </Trade>
+      </Trades>
+      <CashTransactions>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND" currency="USD" amount="40.00" dateTime="20250814"/>
+        <CashTransaction accountId="U1234567" type="Withholding Tax" symbol="AAPL" isin="US0378331005" description="AAPL CASH DIVIDEND - US TAX" currency="USD" amount="-10.00" dateTime="20250814"/>
+        <CashTransaction accountId="U1234567" type="Payment In Lieu Of Dividends" symbol="AAPL" isin="US0378331005" description="AAPL PAYMENT IN LIEU" currency="USD" amount="12.00" dateTime="20250905"/>
+        <CashTransaction accountId="U1234567" type="Withholding Tax" symbol="AAPL" isin="US0378331005" description="AAPL PAYMENT IN LIEU - US TAX" currency="USD" amount="-3.60" dateTime="20250905"/>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="VWRA" isin="IE00BK5BQT80" description="VWRA CASH DIVIDEND" currency="USD" amount="18.00" dateTime="20250925"/>
+        <CashTransaction accountId="U1234567" type="Withholding Tax" symbol="MSFT" isin="US5949181045" description="MSFT WITHHOLDING ADJUSTMENT" currency="USD" amount="-2.50" dateTime="20251120"/>
+        <CashTransaction accountId="U1234567" type="Broker Interest Received" description="USD CREDIT INTEREST" currency="USD" amount="25.00" dateTime="20251231"/>
+        <CashTransaction accountId="U1234567" type="Broker Interest Paid" description="USD DEBIT INTEREST" currency="USD" amount="-3.00" dateTime="20260115"/>
+        <CashTransaction accountId="U1234567" type="Dividends" symbol="AAPL" isin="US0378331005" description="OUT OF PERIOD DIVIDEND" currency="USD" amount="99.00" dateTime="20260410"/>
+      </CashTransactions>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

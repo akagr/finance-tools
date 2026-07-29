@@ -289,6 +289,24 @@ schedulefa generate \
   (SendRequest → poll GetStatement, handling the 1019 "generating" code). `generate`
   accepts `--flex-token` + `--flex-query` (with `--save-statement` to keep the raw XML).
   Tested with an httptest fake server (poll-then-success, error, missing-creds).
+- **M8 — Schedule FSI + TR:** ✅ the income side of the same statement. `ibkr` gained
+  period-based ingest (`Period`, `FinancialYear`) plus the sections FA never needed —
+  `CLOSED_LOT`/nested `<Lot>` realized-gain detail, interest, payments in lieu, and withholding
+  that matches no distribution (previously documented as emitted but actually dropped, which
+  would have forfeited the credit). New packages: `rule115` (Rule 115 specified dates and
+  Rule 128(8), reusing the fx store's preceding-working-day fallback for month ends),
+  `gains` (24-month term, 23-Jul-2024 rate split, per-leg vs net-gain FX, cross-checked against
+  IBKR's `fifoPnlRealized`), `fsi` (the country × head grid, Schedule TR, Form 67 worksheet,
+  Schedule CG/OS tie-out) and `itr` (the ITR country-code list, shared with FA). Renders md/csv/
+  json plus a fragment in the ITD ITR-2 schema's own field names, which is validated against
+  that schema. Column (d) comes from explicit `--marginal-rate`/`--surcharge`/`--cess`
+  assumptions, never a silent guess.
+
+  Bug found while researching it: the ITR country code for the US is **2**, not 1 (Canada is 1;
+  the ITD list disambiguates the shared ISD +1). FA had been emitting 1, which the offline
+  utility's schema enum rejects. Fixed, and the table now lives in `internal/itr` so the two
+  schedules cannot drift apart.
+
 - **M7 — Renderers & UX:** ✅ printable self-contained HTML renderer (`--format html`;
   Print → Save as PDF), sharing a view model with JSON. Reconciliation summary in md/html.
   Fool-proof IBKR setup guide (Flex Query, Query ID, token) in the README. PDF is via the
@@ -302,8 +320,12 @@ schedulefa generate \
 2. **Peak: approximate (mode C) for v1**, exact daily reconstruction (mode B) in M4. Mode C
    output is always labelled "approximate" with a manual-review flag.
 3. **Offline downloaded statement (XML) first**; Flex Web Service online pull deferred to M6.
-4. **Scope = Schedule FA only for v1.** `fx` and `model` packages designed to be reused by
-   future tools (Schedule TR/FSI/CG) but those are out of scope now.
+4. ~~**Scope = Schedule FA only for v1.**~~ **Superseded in M8:** Schedule FSI/TR now ships in
+   the same module as a second command. The reuse bet paid off — `fx`, `model` and `ibkr` were
+   shared as designed — but FSI lives *inside* `schedule-fa/` rather than in its own module,
+   because the repo's isolated-module convention would have meant hand-syncing copies of three
+   substantial packages, and because both schedules read the same Flex statement (which is what
+   makes the FA↔FSI tie-out possible at all).
 5. **USD-first**, but `Currency` is plumbed through every value and the `fx` store is
    keyed by currency from day one, so adding EUR/GBP/etc. is data-only, not code.
 

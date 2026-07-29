@@ -85,13 +85,65 @@ func (l Lot) AcquiredOn() time.Time {
 	return l.VestDate
 }
 
+// DividendKind distinguishes a real distribution from a substitute payment made
+// when the shares were out on loan. Both are credits to the account (so Schedule
+// FA treats them alike), but a payment in lieu is not a dividend for US
+// withholding — it is FDAP income withheld at 30% with no treaty rate — so
+// Schedule FSI must keep them apart.
+type DividendKind string
+
+const (
+	DividendCash   DividendKind = "DIVIDEND"
+	DividendInLieu DividendKind = "PAYMENT_IN_LIEU"
+)
+
 // Dividend is a cash distribution. Schedule FA wants the GROSS figure; the US
-// withholding is tracked separately (relevant later to Schedule TR/FTC).
+// withholding is tracked separately (it is the Schedule TR/FSI credit).
 type Dividend struct {
 	Instrument  Instrument
 	PayDate     time.Time
 	Gross       Money
 	Withholding Money
+	Kind        DividendKind // empty means DividendCash
+}
+
+// Interest is interest credited (or debited) to the account — broker credit
+// interest on idle cash, bond coupons, and the negative margin-interest rows.
+// Amount is signed: positive received, negative paid.
+type Interest struct {
+	Instrument  Instrument // zero-valued for plain broker cash interest
+	Date        time.Time
+	Amount      Money
+	Withholding Money
+	Description string
+}
+
+// Withholding is a foreign tax deduction that could not be attributed to a
+// specific dividend. It is kept rather than dropped because it is still a
+// creditable foreign tax — discarding it silently would forfeit the credit.
+type Withholding struct {
+	Instrument  Instrument
+	Date        time.Time
+	Amount      Money // positive
+	Description string
+}
+
+// RealizedLot is one closed tax lot: the unit of capital-gains computation.
+// IBKR's own FIFO matching produces these, and it is the only reliable source
+// of the acquisition cost of a lot bought before the reporting period.
+//
+// Quantity, Cost and Proceeds are positive magnitudes; Commission is the
+// closing commission as IBKR reports it (negative). RealizedPnL is IBKR's own
+// fifoPnlRealized, kept purely to cross-check our arithmetic.
+type RealizedLot struct {
+	Instrument  Instrument
+	OpenDate    time.Time // acquisition date (drives the holding period)
+	CloseDate   time.Time // date of transfer
+	Quantity    *big.Rat
+	Cost        Money
+	Proceeds    Money
+	Commission  Money
+	RealizedPnL Money
 }
 
 // Position is a holding snapshot on a given date (e.g. the 31-Dec close, or a
@@ -129,13 +181,23 @@ type CorporateAction struct {
 }
 
 // Statement is everything parsed from one IBKR Activity Flex export, already
-// constrained to a single calendar year.
+// constrained to the requested reporting period.
+//
+// Schedule FA runs on the CALENDAR year and uses Year; the income schedules run
+// on the Apr–Mar FINANCIAL year and use From/To. Year is 0 when the period
+// parsed is not a whole calendar year, so FA code cannot silently consume an
+// FY statement.
 type Statement struct {
-	Account          Account
-	Year             int        // calendar year, e.g. 2024
-	OpenPositions    []Position // as on 31-Dec
-	Lots             []Lot
-	Trades           []Trade
-	Dividends        []Dividend
-	CorporateActions []CorporateAction
+	Account              Account
+	Year                 int       // calendar year (0 if the period is not a calendar year)
+	From                 time.Time // inclusive start of the reporting period
+	To                   time.Time // inclusive end of the reporting period
+	OpenPositions        []Position
+	Lots                 []Lot
+	Trades               []Trade
+	RealizedLots         []RealizedLot
+	Dividends            []Dividend
+	Interest             []Interest
+	UnmatchedWithholding []Withholding
+	CorporateActions     []CorporateAction
 }

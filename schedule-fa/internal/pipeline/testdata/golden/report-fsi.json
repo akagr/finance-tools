@@ -1,0 +1,358 @@
+{
+  "financial_year": "2025-26",
+  "assessment_year": "2026-27",
+  "disclaimer": "Not tax advice. A working draft to verify before filing. Schedule FSI covers the FINANCIAL year and converts under Rule 115 — it is NOT comparable figure-for-figure with Schedule FA.",
+  "capital_gains_fx_method": "per-leg",
+  "countries": [
+    {
+      "country_name": "United States of America",
+      "country_code": "2",
+      "tin": "XXXXX1234X",
+      "heads": [
+        {
+          "head": "Salary",
+          "income_outside_india_inr": "0.00",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "0.00",
+          "relief_inr": "0.00"
+        },
+        {
+          "head": "House Property",
+          "income_outside_india_inr": "0.00",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "0.00",
+          "relief_inr": "0.00"
+        },
+        {
+          "head": "Capital Gains",
+          "income_outside_india_inr": "91779.20",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "13047.21",
+          "relief_inr": "0.00",
+          "note": "the US does not tax a non-resident alien's gains on listed stock, so no credit arises"
+        },
+        {
+          "head": "Other Sources",
+          "income_outside_india_inr": "6774.30",
+          "tax_paid_outside_inr": "1406.89",
+          "tax_payable_india_inr": "2113.58",
+          "relief_inr": "1406.89",
+          "dtaa_article": "10",
+          "note": "dividends and interest are aggregated in this row; cite the article for the income actually bearing the tax (10 dividends, 11 interest)"
+        }
+      ],
+      "total": {
+        "head": "Total",
+        "income_outside_india_inr": "98553.50",
+        "tax_paid_outside_inr": "1406.89",
+        "tax_payable_india_inr": "15160.79",
+        "relief_inr": "1406.89"
+      },
+      "needs_review": true,
+      "review_note": "AAPL: payment in lieu of dividend (shares were on loan) — withheld at the US statutory 30%, not the 25% treaty rate, and not a qualified dividend; interest PAID of 3 USD is an expense, not income — it is excluded here; any s.57 claim must be made manually; withholding of 220.25 INR on 2025-11-20 could not be matched to a distribution — confirm the income it relates to before claiming the credit"
+    },
+    {
+      "country_name": "Ireland",
+      "country_code": "353",
+      "tin": "XXXXX1234X",
+      "heads": [
+        {
+          "head": "Salary",
+          "income_outside_india_inr": "0.00",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "0.00",
+          "relief_inr": "0.00"
+        },
+        {
+          "head": "House Property",
+          "income_outside_india_inr": "0.00",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "0.00",
+          "relief_inr": "0.00"
+        },
+        {
+          "head": "Capital Gains",
+          "income_outside_india_inr": "12991.00",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "1688.83",
+          "relief_inr": "0.00",
+          "note": "no foreign tax was withheld on these gains — confirm whether the source country taxes them"
+        },
+        {
+          "head": "Other Sources",
+          "income_outside_india_inr": "1573.20",
+          "tax_paid_outside_inr": "0.00",
+          "tax_payable_india_inr": "490.84",
+          "relief_inr": "0.00"
+        }
+      ],
+      "total": {
+        "head": "Total",
+        "income_outside_india_inr": "14564.20",
+        "tax_paid_outside_inr": "0.00",
+        "tax_payable_india_inr": "2179.67",
+        "relief_inr": "0.00"
+      },
+      "needs_review": false
+    }
+  ],
+  "schedule_tr": [
+    {
+      "country_name": "United States of America",
+      "country_code": "2",
+      "tin": "XXXXX1234X",
+      "tax_paid_outside_inr": "1406.89",
+      "relief_available_inr": "1406.89",
+      "relief_claimed_us": "90"
+    }
+  ],
+  "schedule_tr_totals": {
+    "total_tax_paid_outside_inr": "1406.89",
+    "total_relief_inr": "1406.89",
+    "relief_us_90_90a_inr": "1406.89"
+  },
+  "form_67": [
+    {
+      "country_name": "United States of America",
+      "country_code": "2",
+      "income_type": "Dividend",
+      "income_inr": "3488.00",
+      "tax_paid_inr": "872.00",
+      "dtaa_article": "10"
+    },
+    {
+      "country_name": "United States of America",
+      "country_code": "2",
+      "income_type": "Payment in lieu of dividend",
+      "income_inr": "1048.80",
+      "tax_paid_inr": "314.64"
+    },
+    {
+      "country_name": "United States of America",
+      "country_code": "2",
+      "income_type": "Unattributed withholding",
+      "income_inr": "0.00",
+      "tax_paid_inr": "220.25"
+    }
+  ],
+  "capital_gains": [
+    {
+      "security": "AAPL",
+      "isin": "US0378331005",
+      "acquired_on": "2022-05-10",
+      "transferred_on": "2025-08-20",
+      "quantity": "10",
+      "term": "LTCG",
+      "transferred_before_23_jul_2024": false,
+      "cost_inr": "114825.00",
+      "proceeds_inr": "200560.00",
+      "transfer_expenses_inr": "87.20",
+      "gain_inr": "85647.80",
+      "audit": [
+        {
+          "figure": "Cost",
+          "source_currency": "USD",
+          "source_amount": "1500.00",
+          "ttbr": "76.5500",
+          "rate_date": "2022-04-30",
+          "result_inr": "114825.00"
+        },
+        {
+          "figure": "Proceeds",
+          "source_currency": "USD",
+          "source_amount": "2300.00",
+          "ttbr": "87.2000",
+          "rate_date": "2025-07-31",
+          "result_inr": "200560.00"
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "security": "AAPL",
+      "isin": "US0378331005",
+      "acquired_on": "2025-01-15",
+      "transferred_on": "2025-08-20",
+      "quantity": "5",
+      "term": "STCG",
+      "transferred_before_23_jul_2024": false,
+      "cost_inr": "94105.00",
+      "proceeds_inr": "100280.00",
+      "transfer_expenses_inr": "43.60",
+      "gain_inr": "6131.40",
+      "audit": [
+        {
+          "figure": "Cost",
+          "source_currency": "USD",
+          "source_amount": "1100.00",
+          "ttbr": "85.5500",
+          "rate_date": "2024-12-31",
+          "result_inr": "94105.00"
+        },
+        {
+          "figure": "Proceeds",
+          "source_currency": "USD",
+          "source_amount": "1150.00",
+          "ttbr": "87.2000",
+          "rate_date": "2025-07-31",
+          "result_inr": "100280.00"
+        }
+      ],
+      "needs_review": false
+    },
+    {
+      "security": "VWRA",
+      "isin": "IE00BK5BQT80",
+      "acquired_on": "2023-11-20",
+      "transferred_on": "2026-02-10",
+      "quantity": "4",
+      "term": "LTCG",
+      "transferred_before_23_jul_2024": false,
+      "cost_inr": "33200.00",
+      "proceeds_inr": "46280.00",
+      "transfer_expenses_inr": "89.00",
+      "gain_inr": "12991.00",
+      "audit": [
+        {
+          "figure": "Cost",
+          "source_currency": "USD",
+          "source_amount": "400.00",
+          "ttbr": "83.0000",
+          "rate_date": "2023-10-31",
+          "result_inr": "33200.00"
+        },
+        {
+          "figure": "Proceeds",
+          "source_currency": "USD",
+          "source_amount": "520.00",
+          "ttbr": "89.0000",
+          "rate_date": "2026-01-31",
+          "result_inr": "46280.00"
+        }
+      ],
+      "needs_review": false
+    }
+  ],
+  "other_sources": [
+    {
+      "type": "Dividend",
+      "security": "AAPL",
+      "country_code": "2",
+      "income_inr": "3488.00",
+      "tax_paid_inr": "872.00",
+      "audit": [
+        {
+          "figure": "Dividend",
+          "source_currency": "USD",
+          "source_amount": "40.00",
+          "ttbr": "87.2000",
+          "rate_date": "2025-07-31",
+          "result_inr": "3488.00"
+        },
+        {
+          "figure": "Dividend",
+          "source_currency": "USD",
+          "source_amount": "10.00",
+          "ttbr": "87.2000",
+          "rate_date": "2025-07-31",
+          "result_inr": "872.00"
+        }
+      ]
+    },
+    {
+      "type": "Payment in lieu of dividend",
+      "security": "AAPL",
+      "country_code": "2",
+      "income_inr": "1048.80",
+      "tax_paid_inr": "314.64",
+      "audit": [
+        {
+          "figure": "Payment in lieu of dividend",
+          "source_currency": "USD",
+          "source_amount": "12.00",
+          "ttbr": "87.4000",
+          "rate_date": "2025-08-29",
+          "result_inr": "1048.80"
+        },
+        {
+          "figure": "Payment in lieu of dividend",
+          "source_currency": "USD",
+          "source_amount": "3.60",
+          "ttbr": "87.4000",
+          "rate_date": "2025-08-29",
+          "result_inr": "314.64"
+        }
+      ]
+    },
+    {
+      "type": "Dividend",
+      "security": "VWRA",
+      "country_code": "353",
+      "income_inr": "1573.20",
+      "tax_paid_inr": "0.00",
+      "audit": [
+        {
+          "figure": "Dividend",
+          "source_currency": "USD",
+          "source_amount": "18.00",
+          "ttbr": "87.4000",
+          "rate_date": "2025-08-29",
+          "result_inr": "1573.20"
+        }
+      ]
+    },
+    {
+      "type": "Interest",
+      "security": "USD CREDIT INTEREST",
+      "country_code": "2",
+      "income_inr": "2237.50",
+      "tax_paid_inr": "0.00",
+      "audit": [
+        {
+          "figure": "Interest",
+          "source_currency": "USD",
+          "source_amount": "25.00",
+          "ttbr": "89.5000",
+          "rate_date": "2026-03-31",
+          "result_inr": "2237.50"
+        }
+      ]
+    },
+    {
+      "type": "Unattributed withholding",
+      "security": "MSFT",
+      "country_code": "2",
+      "income_inr": "0.00",
+      "tax_paid_inr": "220.25",
+      "audit": [
+        {
+          "figure": "Unattributed withholding",
+          "source_currency": "USD",
+          "source_amount": "2.50",
+          "ttbr": "88.1000",
+          "rate_date": "2025-10-31",
+          "result_inr": "220.25"
+        }
+      ]
+    }
+  ],
+  "tie_out": {
+    "schedule_cg_a5_stcg_inr": "6131.40",
+    "schedule_cg_b8_ltcg_inr": "98638.80",
+    "schedule_cg_b8_ltcg_pre_23_jul_2024_inr": "0.00",
+    "schedule_os_inr": "8347.50"
+  },
+  "assumptions": [
+    "Slab (marginal) rate applied to short-term gains and Other Sources: 30%",
+    "Surcharge 0% (capped at 15% on s.112 long-term gains) and cess 4% are included in column (d)",
+    "Long-term gains on foreign shares: holding period \u003e 24 months, taxed at 12.5% without indexation (s.112, transfers on/after 23 Jul 2024)",
+    "Capital-gains FX method: per-leg",
+    "Income converted under Rule 115 (TTBR of the last day of the preceding month; 31 March for other income), foreign tax under Rule 128(8) — NOT the Schedule FA event-date convention",
+    "Relief is the lower of the foreign tax and the Indian tax on the same income; excess foreign tax cannot be carried forward"
+  ],
+  "review_notes": [
+    "Column (b) must equal the income actually offered in Schedule CG / Schedule OS — check it against the tie-out section before filing",
+    "Schedule FA covers the CALENDAR year and converts at event-date rates; this schedule covers the FINANCIAL year at Rule 115 rates. The two are not meant to agree",
+    "Form 67 must be filed to claim this relief — by the end of AY 2026-27 under the amended Rule 128(9), but file it with the return"
+  ]
+}
