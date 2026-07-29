@@ -9,7 +9,7 @@
 //
 // `rate` is the value of one unit of `currency` in the base currency (e.g. INR
 // per USD). Lookups use preceding-available-day fallback, mirroring the TTBR/
-// price lookups in schedule-fa (markets are shut on weekends/holidays).
+// price lookups in itr-foreign (markets are shut on weekends/holidays).
 package fxconv
 
 import (
