@@ -57,7 +57,7 @@ func TestBuildA3(t *testing.T) {
 	}{
 		{"entity", row.EntityName, "Alpha Inc"},
 		{"country", row.CountryName, "United States of America"},
-		{"country code", row.CountryCode, "1"}, // ISD code for the US
+		{"country code", row.CountryCode, "2"}, // ITR country code for the US (Canada is 1)
 		{"nature", row.NatureEntity, "Listed equity share"},
 		{"acquired", row.AcquiredOn, "2024-03-15"},
 		{"initial", row.InitialValue.INR.Amount.RatString(), "80000"},  // 1000 * 80

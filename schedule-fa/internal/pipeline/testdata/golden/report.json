@@ -6,7 +6,7 @@
       "institution": "Interactive Brokers LLC",
       "address": "One Pickwick Plaza, Greenwich, CT",
       "zip": "06830",
-      "country_code": "1",
+      "country_code": "2",
       "account_number": "U1234567",
       "status": "Owner",
       "account_opened": "2021-05-10",
@@ -20,7 +20,7 @@
   "a3": [
     {
       "country_name": "United States of America",
-      "country_code": "1",
+      "country_code": "2",
       "entity_name": "Apple Inc.",
       "address": "One Apple Park Way, Cupertino, CA, USA",
       "zip": "95014",
@@ -79,7 +79,7 @@
     },
     {
       "country_name": "United States of America",
-      "country_code": "1",
+      "country_code": "2",
       "entity_name": "Microsoft Corporation",
       "address": "One Microsoft Way, Redmond, WA, USA",
       "zip": "98052",
@@ -137,7 +137,7 @@
     },
     {
       "country_name": "United States of America",
-      "country_code": "1",
+      "country_code": "2",
       "entity_name": "Vanguard S\u0026P 500 ETF (Vanguard Group Inc.)",
       "address": "100 Vanguard Blvd, Malvern, PA, USA",
       "zip": "19355",

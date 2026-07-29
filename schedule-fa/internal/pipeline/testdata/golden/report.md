@@ -5,7 +5,7 @@
 ## Table A2 — Foreign Custodial Account
 
 - **Institution:** Interactive Brokers LLC
-- **Address:** One Pickwick Plaza, Greenwich, CT 06830 · country code 1
+- **Address:** One Pickwick Plaza, Greenwich, CT 06830 · country code 2
 - **Account number:** U1234567 · **Status:** Owner · **Opened:** 2021-05-10
 - **Peak balance:** ₹3349210.00 · **Closing balance:** ₹2600720.00 · **Gross credited:** ₹6906.05
 - ⚠︎ _peak balance is an upper bound (per-security peaks summed, not simultaneous); cash not included_
@@ -14,9 +14,9 @@
 
 | # | Entity | Country (code) | Acquired | Initial (INR) | Peak (INR) | Closing (INR) | Dividend (INR) | Proceeds (INR) | Review |
 |---|--------|----------------|----------|--------------:|-----------:|--------------:|---------------:|---------------:|:------:|
-| 1 | Apple Inc. | United States of America (1) | 2023-01-10 | 499500.00 | 2138750.00 | 2138750.00 | 4618.25 | 0.00 | ⚠︎ |
-| 2 | Microsoft Corporation | United States of America (1) | 2024-02-01 | 666890.00 | 748490.00 | 0.00 | 0.00 | 760995.00 |  |
-| 3 | Vanguard S&P 500 ETF (Vanguard Group Inc.) | United States of America (1) | 2024-06-20 | 418575.00 | 461970.00 | 461970.00 | 2287.80 | 0.00 |  |
+| 1 | Apple Inc. | United States of America (2) | 2023-01-10 | 499500.00 | 2138750.00 | 2138750.00 | 4618.25 | 0.00 | ⚠︎ |
+| 2 | Microsoft Corporation | United States of America (2) | 2024-02-01 | 666890.00 | 748490.00 | 0.00 | 0.00 | 760995.00 |  |
+| 3 | Vanguard S&P 500 ETF (Vanguard Group Inc.) | United States of America (2) | 2024-06-20 | 418575.00 | 461970.00 | 461970.00 | 2287.80 | 0.00 |  |
 
 ## Reconciliation
 

@@ -22,6 +22,7 @@ import (
 
 	"github.com/akagr/finance-tools/schedule-fa/internal/entities"
 	"github.com/akagr/finance-tools/schedule-fa/internal/fx"
+	"github.com/akagr/finance-tools/schedule-fa/internal/itr"
 	"github.com/akagr/finance-tools/schedule-fa/internal/model"
 	"github.com/akagr/finance-tools/schedule-fa/internal/peak"
 )
@@ -127,7 +128,7 @@ func Build(s *model.Statement, store fx.Store, peaks []peak.Result, opts Options
 			NatureEntity: natureOf(inst.AssetClass),
 			PeakApprox:   true,
 		}
-		row.CountryName, row.CountryCode = countryFor(inst.ListingCtry)
+		row.CountryName, row.CountryCode = itr.Country(inst.ListingCtry)
 
 		// User-supplied entity metadata overrides the IBKR-derived defaults.
 		if e, ok := ents.Lookup(inst.ISIN, inst.Symbol); ok {
@@ -230,7 +231,7 @@ func buildA2(s *model.Statement, a3 []A3Row, exactPeak *fx.Conversion) A2Row {
 		peaks = append(peaks, r.PeakValue)
 		credited = append(credited, r.GrossDividend)
 	}
-	addr, zip, _, code := institutionMeta(acc.IBEntity)
+	addr, zip, _, code := itr.Institution(acc.IBEntity)
 	row := A2Row{
 		Institution:    acc.Institution,
 		Address:        addr,
@@ -266,17 +267,6 @@ func sumAmounts(amts []Amount) Amount {
 		audit = append(audit, a.Audit...)
 	}
 	return Amount{INR: model.NewMoney(model.INR, sum), Audit: audit}
-}
-
-// institutionMeta returns the broker entity's address, ZIP, country name, and
-// ITR country code for Table A2.
-func institutionMeta(ibEntity string) (address, zip, countryName, itrCode string) {
-	switch strings.ToUpper(strings.TrimSpace(ibEntity)) {
-	case "", "IBLLC-US", "IBLLC":
-		return "One Pickwick Plaza, Greenwich, CT", "06830", "United States of America", "1"
-	default:
-		return "", "", "", ""
-	}
 }
 
 // convertEvents converts each event to INR and sums them, collecting the audit
@@ -386,38 +376,6 @@ func concatErrs(groups ...[]error) []error {
 		out = append(out, g...)
 	}
 	return out
-}
-
-// isdCountries maps an ISO-3166 alpha-2 (or common 3-letter) code to (display
-// name, ISD telephone code). Schedule FA uses the country's ISD code as its
-// "country code". Only common ones are mapped; the rest are flagged for manual
-// entry (set via --entities).
-var isdCountries = map[string][2]string{
-	"US":  {"United States of America", "1"},
-	"USA": {"United States of America", "1"},
-	"IE":  {"Ireland", "353"},
-	"GB":  {"United Kingdom", "44"},
-	"UK":  {"United Kingdom", "44"},
-	"CA":  {"Canada", "1"},
-	"AU":  {"Australia", "61"},
-	"DE":  {"Germany", "49"},
-	"NL":  {"Netherlands", "31"},
-	"FR":  {"France", "33"},
-	"CH":  {"Switzerland", "41"},
-	"SG":  {"Singapore", "65"},
-	"JP":  {"Japan", "81"},
-	"HK":  {"Hong Kong", "852"},
-	"LU":  {"Luxembourg", "352"},
-}
-
-func countryFor(iso string) (name, code string) {
-	if iso == "" {
-		return "", ""
-	}
-	if v, ok := isdCountries[strings.ToUpper(iso)]; ok {
-		return v[0], v[1]
-	}
-	return iso, "" // ISD code must be filled manually
 }
 
 func natureOf(assetClass string) string {
