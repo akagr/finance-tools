@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/akagr/finance-tools/networth/internal/store"
@@ -265,60 +266,95 @@ func (s *accountsScreen) detail(a store.Account, width int) string {
 	return b.String()
 }
 
-// accountForm edits one account. Each field carries a one-line explanation,
-// because these choices decide how every later number is computed and are not
-// obvious from the field name alone.
+// accountForm edits one account.
+//
+// Fields whose valid values are a fixed set are choices rather than text, and
+// the currency completes against what is already in use. Typing a value that
+// only fails on save is a decision turned into a spelling test.
 type accountForm struct {
 	m       *Model
 	account store.Account
 	editing bool
 	field   int
-	inputs  []textinput.Model
+	fields  []*field
 	err     string
-}
-
-var accountFields = []struct {
-	label string
-	help  string
-}{
-	{"Name", "what you call it — must be unique"},
-	{"Kind", "asset, liability, income, expense or equity"},
-	{"Currency", "the currency the balance is held in"},
-	{"Counts towards net worth", "yes for things you own or owe; no for salary, spending, or an employer pool you do not control yet"},
-	{"Institution", "optional — the bank, broker or provider"},
-	{"Asset class", "optional — equity, debt, cash, property, gold…"},
-	{"Notes", "optional"},
 }
 
 func newAccountForm(m *Model, a store.Account, editing bool) *accountForm {
 	f := &accountForm{m: m, account: a, editing: editing}
-	values := []string{
-		a.Name, a.Kind, a.Currency, boolWord(a.InNetworth),
-		a.Institution, a.Tags["asset_class"], a.Notes,
+
+	f.fields = []*field{
+		newTextField("Name", "what you call it — must be unique"),
+		newChoiceField("Kind", "asset and liability count towards net worth; "+
+			"income, expense and equity are where money comes from and goes to",
+			[]string{"asset", "liability", "income", "expense", "equity"}),
+		newSuggestField("Currency", "the currency the balance is held in",
+			m.currencies(), false),
+		newChoiceField("Counts towards net worth",
+			"yes for things you own or owe; no for salary, spending, or an "+
+				"employer pool you do not control yet",
+			[]string{"yes", "no"}),
+		newChoiceField("Tracked by",
+			"snapshots: you state the balance now and then. transactions: it is "+
+				"the sum of what went in and out. units: quantity times price.",
+			[]string{"snapshots", "transactions", "units"}),
+		newTextField("Institution", "optional — the bank, broker or provider"),
+		newSuggestField("Tags", "key=value, comma separated. Any dimension you want to "+
+			"slice or select by. Formulas select accounts with tag:key=value.",
+			m.tagSuggestions(), false),
+		newTextField("Notes", "optional"),
 	}
-	for i, v := range values {
-		in := textinput.New()
-		in.Prompt = ""
-		in.CharLimit = 80
-		in.SetValue(v)
-		if i == 0 {
-			in.Focus()
-		}
-		f.inputs = append(f.inputs, in)
-	}
+
+	f.fields[0].SetValue(a.Name)
+	f.fields[1].SetValue(a.Kind)
+	f.fields[2].SetValue(a.Currency)
+	f.fields[3].SetValue(boolWord(a.InNetworth))
+	f.fields[4].SetValue(a.Tracking)
+	f.fields[5].SetValue(a.Institution)
+	f.fields[6].SetValue(formatTags(a.Tags))
+	f.fields[7].SetValue(a.Notes)
+	f.fields[0].Focus()
 	return f
 }
 
 func (f *accountForm) Hints() []hint {
-	return []hint{{"↑↓ / ⇥", "field"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
+	cur := f.fields[f.field]
+	h := []hint{{"↑↓ / ⇥", "field"}}
+	switch cur.kind {
+	case fieldChoice:
+		h = []hint{{"←→ / space", "choose"}, {"↑↓", "field"}}
+	case fieldSuggest:
+		if cur.open {
+			h = []hint{{"↑↓", "pick"}, {"⇥ / ↵", "accept"}, {"esc", "close"}}
+		}
+	}
+	return append(h, hint{"ctrl+s", "save"}, hint{"esc", "cancel"})
 }
 
 func (f *accountForm) Update(key tea.KeyMsg) (done bool, cmd tea.Cmd) {
+	// Save and cancel come first so they always work, whatever a field is doing.
+	switch key.String() {
+	case "ctrl+s":
+		if err := f.save(); err != nil {
+			f.err = err.Error()
+			return false, nil
+		}
+		name := f.fields[0].Value()
+		return true, tea.Batch(
+			func() tea.Msg { return refreshMsg{} },
+			func() tea.Msg { return statusMsg(name + " saved") })
+	}
+
+	if handled, c := f.fields[f.field].Update(key); handled {
+		f.err = ""
+		return false, c
+	}
+
 	switch key.String() {
 	case "esc":
 		return true, nil
-	case "ctrl+s", "enter":
-		if key.String() == "enter" && f.field < len(f.inputs)-1 {
+	case "enter":
+		if f.field < len(f.fields)-1 {
 			f.focus(f.field + 1)
 			return false, nil
 		}
@@ -326,62 +362,49 @@ func (f *accountForm) Update(key tea.KeyMsg) (done bool, cmd tea.Cmd) {
 			f.err = err.Error()
 			return false, nil
 		}
-		name := f.inputs[0].Value()
 		return true, tea.Batch(
 			func() tea.Msg { return refreshMsg{} },
-			func() tea.Msg { return statusMsg(name + " saved") })
+			func() tea.Msg { return statusMsg(f.fields[0].Value() + " saved") })
 	case "tab", "down":
-		f.focus((f.field + 1) % len(f.inputs))
-		return false, nil
+		f.focus((f.field + 1) % len(f.fields))
 	case "shift+tab", "up":
-		f.focus((f.field + len(f.inputs) - 1) % len(f.inputs))
-		return false, nil
+		f.focus((f.field + len(f.fields) - 1) % len(f.fields))
 	}
-	var c tea.Cmd
-	f.inputs[f.field], c = f.inputs[f.field].Update(key)
-	f.err = ""
-	return false, c
+	return false, nil
 }
 
 func (f *accountForm) focus(i int) {
-	f.inputs[f.field].Blur()
+	f.fields[f.field].Blur()
 	f.field = i
-	f.inputs[f.field].Focus()
-	f.inputs[f.field].CursorEnd()
+	f.fields[f.field].Focus()
 }
 
 func (f *accountForm) save() error {
 	a := f.account
-	a.Name = strings.TrimSpace(f.inputs[0].Value())
+	a.Name = strings.TrimSpace(f.fields[0].Value())
 	if a.Name == "" {
 		return fmt.Errorf("an account needs a name")
 	}
-	a.Kind = strings.ToLower(strings.TrimSpace(f.inputs[1].Value()))
-	switch a.Kind {
-	case "asset", "liability", "income", "expense", "equity":
-	default:
-		return fmt.Errorf("kind must be asset, liability, income, expense or equity")
-	}
-	a.Currency = strings.ToUpper(strings.TrimSpace(f.inputs[2].Value()))
+	a.Kind = f.fields[1].Value()
+	a.Currency = strings.ToUpper(strings.TrimSpace(f.fields[2].Value()))
 	if a.Currency == "" {
 		a.Currency = f.m.settings.BaseCurrency
 	}
-	a.InNetworth = parseBoolWord(f.inputs[3].Value())
-	a.Institution = strings.TrimSpace(f.inputs[4].Value())
-	if a.Tags == nil {
-		a.Tags = map[string]string{}
+	a.InNetworth = f.fields[3].Value() == "yes"
+	a.Tracking = f.fields[4].Value()
+	a.Institution = strings.TrimSpace(f.fields[5].Value())
+
+	tags, err := parseTagField(f.fields[6].Value())
+	if err != nil {
+		return err
 	}
-	if v := strings.TrimSpace(f.inputs[5].Value()); v != "" {
-		a.Tags["asset_class"] = v
-	} else {
-		delete(a.Tags, "asset_class")
-	}
-	a.Notes = strings.TrimSpace(f.inputs[6].Value())
+	a.Tags = tags
+	a.Notes = strings.TrimSpace(f.fields[7].Value())
 
 	if f.editing {
 		return f.m.store.UpdateAccount(a)
 	}
-	_, err := f.m.store.AddAccount(a)
+	_, err = f.m.store.AddAccount(a)
 	return err
 }
 
@@ -393,21 +416,60 @@ func (f *accountForm) View(width, height int) string {
 	}
 	b.WriteString("\n  " + styHeading.Render(title) + "\n\n")
 
-	for i, in := range f.inputs {
-		style, marker := styFieldLabel, "  "
+	const labelW = 26
+	for i, fl := range f.fields {
+		b.WriteString(fl.View(labelW, i == f.field))
+		b.WriteString(fl.Extra(labelW+2, 6))
 		if i == f.field {
-			style, marker = styFieldActive, styKey.Render("▸ ")
-		}
-		b.WriteString(marker + style.Render(pad(accountFields[i].label, 26, false)) + in.View() + "\n")
-		if i == f.field {
-			b.WriteString("    " + pad("", 26, false) +
-				styFaint.Render(wrap(accountFields[i].help, min(width-34, 62))) + "\n")
+			b.WriteString(fl.Help(labelW+2, width))
 		}
 	}
 	if f.err != "" {
 		b.WriteString("\n  " + styError.Render(f.err) + "\n")
 	}
 	return b.String()
+}
+
+// currencies lists the currencies already in use, so the common case is one
+// keystroke and a new one is still possible.
+func (m *Model) currencies() []string {
+	seen := map[string]bool{m.settings.BaseCurrency: true}
+	if accts, err := m.store.Accounts(true); err == nil {
+		for _, a := range accts {
+			seen[a.Currency] = true
+		}
+	}
+	var out []string
+	for c := range seen {
+		out = append(out, c)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// tagSuggestions offers the tags already in use, which is how a convention
+// spreads without having to be remembered or written down.
+func (m *Model) tagSuggestions() []string {
+	seen := map[string]bool{}
+	if accts, err := m.store.Accounts(true); err == nil {
+		for _, a := range accts {
+			for k, v := range a.Tags {
+				seen[k+"="+v] = true
+			}
+		}
+	}
+	for _, common := range []string{
+		"asset_class=equity", "asset_class=debt", "asset_class=cash",
+		"asset_class=property", "type=credit_card", "liquidity=low", "owner=self",
+	} {
+		seen[common] = true
+	}
+	var out []string
+	for t := range seen {
+		out = append(out, t)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func boolWord(b bool) string {
@@ -423,4 +485,47 @@ func parseBoolWord(s string) bool {
 		return true
 	}
 	return false
+}
+
+// formatTags renders an account's tags back into the single field they are
+// edited through.
+func formatTags(m map[string]string) string {
+	if len(m) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+m[k])
+	}
+	return strings.Join(parts, ", ")
+}
+
+// parseTagField reads "key=value, key=value".
+//
+// Tags are free-form on purpose: they are what a formula selects accounts by
+// (tag:type=credit_card), and what every future way of slicing the portfolio
+// will hang off, so the interface must not restrict them to a fixed list.
+func parseTagField(s string) (map[string]string, error) {
+	out := map[string]string{}
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(part, "=")
+		if !ok {
+			return nil, fmt.Errorf("tags look like key=value; %q has no =", part)
+		}
+		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
+		if k == "" || v == "" {
+			return nil, fmt.Errorf("tags look like key=value; %q is incomplete", part)
+		}
+		out[k] = v
+	}
+	return out, nil
 }

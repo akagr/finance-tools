@@ -24,6 +24,14 @@ type Balances interface {
 	Balance(selector string) (*big.Rat, bool)
 }
 
+// Suggester is an optional extra a Balances implementation can provide so that a
+// selector matching nothing can say what would have worked. A bare "no match" is
+// a dead end when the vocabulary is invisible: the whole difficulty is knowing
+// that a tag has to exist on an account before tag:… can select it.
+type Suggester interface {
+	Selectors() []string
+}
+
 // BaseEnv implements Env with a set of variables and the standard functions.
 type BaseEnv struct {
 	Vars     map[string]*big.Rat
@@ -90,7 +98,8 @@ func (e *BaseEnv) Call(name string, args []Value) (*big.Rat, error) {
 		if len(missing) > 0 {
 			// Silently treating an unknown account as zero would produce a
 			// plausible number from a typo, and move the wrong amount of money.
-			return nil, fmt.Errorf("no account matches %s", strings.Join(quoteAll(missing), " or "))
+			return nil, fmt.Errorf("no account matches %s%s",
+				strings.Join(quoteAll(missing), " or "), e.suggest(missing[0]))
 		}
 		if name == "owed" {
 			return total.Neg(total), nil
@@ -216,3 +225,31 @@ func roundRat(v *big.Rat, mode string) *big.Rat {
 }
 
 var oneInt = big.NewInt(1)
+
+// suggest builds the "; try …" half of a failed-selector message, listing the
+// selectors of the same shape as the one that missed.
+func (e *BaseEnv) suggest(missed string) string {
+	s, ok := e.Accounts.(Suggester)
+	if !ok {
+		return ""
+	}
+	all := s.Selectors()
+	wantTag := strings.HasPrefix(strings.ToLower(missed), "tag:")
+	var same []string
+	for _, sel := range all {
+		if strings.HasPrefix(sel, "tag:") == wantTag {
+			same = append(same, sel)
+		}
+	}
+	if len(same) == 0 {
+		if wantTag {
+			return "; no account carries any tag yet — add one on the Accounts screen, " +
+				"for example type=credit_card"
+		}
+		return ""
+	}
+	if len(same) > 6 {
+		same = append(same[:6], "…")
+	}
+	return "; try " + strings.Join(same, ", ")
+}

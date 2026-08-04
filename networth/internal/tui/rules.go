@@ -3,12 +3,12 @@ package tui
 import (
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 
 	"github.com/akagr/finance-tools/networth/internal/expr"
 	"github.com/akagr/finance-tools/networth/internal/money"
 	"github.com/akagr/finance-tools/networth/internal/plan"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -23,40 +23,61 @@ type ruleForm struct {
 	rule    plan.Rule
 	editing bool
 	field   int
-	inputs  []textinput.Model
+	fields  []*field
 	err     string
 	preview string
 }
 
-var ruleFields = []struct{ label, help string }{
-	{"Name", "what this transfer is for"},
-	{"To account", "where the money goes"},
-	{"How much", "50000 · 40% · 40% of income · remainder · or a formula"},
-	{"Stage", "setaside comes off income first; invest divides what is left"},
-	{"Priority", "lower runs first; a rule can use what earlier ones left"},
-}
+const (
+	ruleFieldName = iota
+	ruleFieldAccount
+	ruleFieldHowMuch
+	ruleFieldStage
+	ruleFieldPriority
+)
 
 func newRuleForm(m *Model, r plan.Rule, editing bool) *ruleForm {
 	f := &ruleForm{m: m, rule: r, editing: editing}
-	stage := string(plan.StageInvest)
+	f.fields = []*field{
+		newTextField("Name", "what this transfer is for"),
+		// Strict: a rule pointing at an account that does not exist would fail
+		// silently every month, so the value has to come from the list.
+		newSuggestField("To account", "where the money goes — start typing to filter",
+			m.accountNames(), true),
+		newTextField("How much",
+			"50000 · 40% · 40% of income · remainder · or a formula"),
+		newChoiceField("Stage",
+			"set aside comes off income first — spending, EMI, a fixed deposit. "+
+				"invest divides whatever is left.",
+			[]string{"set aside", "invest"}),
+		newTextField("Priority", "lower runs first; a rule can use what earlier ones left"),
+	}
+	f.fields[ruleFieldName].SetValue(r.Name)
+	f.fields[ruleFieldAccount].SetValue(r.Account)
+	f.fields[ruleFieldHowMuch].SetValue(howMuchText(r, m.settings.Grouping))
+	stage := "invest"
 	if r.Stage == plan.StageSetAside {
-		stage = string(plan.StageSetAside)
+		stage = "set aside"
 	}
-	values := []string{
-		r.Name, r.Account, howMuchText(r, m.settings.Grouping), stage, fmt.Sprint(r.Priority),
-	}
-	for i, v := range values {
-		in := textinput.New()
-		in.Prompt = ""
-		in.CharLimit = 200
-		in.SetValue(v)
-		if i == 0 {
-			in.Focus()
-		}
-		f.inputs = append(f.inputs, in)
-	}
+	f.fields[ruleFieldStage].SetValue(stage)
+	f.fields[ruleFieldPriority].SetValue(fmt.Sprint(r.Priority))
+	f.fields[ruleFieldName].Focus()
 	f.updatePreview()
 	return f
+}
+
+// accountNames lists every open account, for the destination field.
+func (m *Model) accountNames() []string {
+	accts, err := m.store.Accounts(false)
+	if err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(accts))
+	for _, a := range accts {
+		out = append(out, a.Name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // howMuchText renders a rule back into the single field it is edited through.
@@ -69,6 +90,11 @@ func howMuchText(r plan.Rule, g money.Grouping) string {
 	case plan.KindFormula:
 		return r.Formula
 	case plan.KindPercent:
+		// A brand new rule has no amount yet. Showing "0%" would look like a
+		// decision rather than a blank waiting to be filled.
+		if r.Value == 0 {
+			return ""
+		}
 		s := fmt.Sprintf("%.4g%%", r.Percent())
 		switch r.Basis {
 		case plan.BasisIncome:
@@ -139,24 +165,42 @@ func containsLetter(s string) bool {
 }
 
 func (f *ruleForm) Hints() []hint {
-	return []hint{{"↑↓ / ⇥", "field"}, {"ctrl+s", "save"}, {"esc", "cancel"}}
+	cur := f.fields[f.field]
+	h := []hint{{"↑↓ / ⇥", "field"}}
+	switch cur.kind {
+	case fieldChoice:
+		h = []hint{{"←→ / space", "choose"}, {"↑↓", "field"}}
+	case fieldSuggest:
+		if cur.open {
+			h = []hint{{"↑↓", "pick"}, {"⇥ / ↵", "accept"}, {"esc", "close"}}
+		}
+	}
+	return append(h, hint{"ctrl+s", "save"}, hint{"esc", "cancel"})
 }
 
 func (f *ruleForm) Update(key tea.KeyMsg) (bool, tea.Cmd) {
-	switch key.String() {
-	case "esc":
-		return true, nil
-	case "ctrl+s":
+	if key.String() == "ctrl+s" {
 		if err := f.save(); err != nil {
 			f.err = err.Error()
 			return false, nil
 		}
-		name := f.inputs[0].Value()
+		name := f.fields[ruleFieldName].Value()
 		return true, tea.Batch(
 			func() tea.Msg { return refreshMsg{} },
 			func() tea.Msg { return statusMsg(name + " saved") })
+	}
+
+	if handled, cmd := f.fields[f.field].Update(key); handled {
+		f.err = ""
+		f.updatePreview()
+		return false, cmd
+	}
+
+	switch key.String() {
+	case "esc":
+		return true, nil
 	case "enter":
-		if f.field < len(f.inputs)-1 {
+		if f.field < len(f.fields)-1 {
 			f.focus(f.field + 1)
 			return false, nil
 		}
@@ -166,31 +210,24 @@ func (f *ruleForm) Update(key tea.KeyMsg) (bool, tea.Cmd) {
 		}
 		return true, func() tea.Msg { return refreshMsg{} }
 	case "tab", "down":
-		f.focus((f.field + 1) % len(f.inputs))
-		return false, nil
+		f.focus((f.field + 1) % len(f.fields))
 	case "shift+tab", "up":
-		f.focus((f.field + len(f.inputs) - 1) % len(f.inputs))
-		return false, nil
+		f.focus((f.field + len(f.fields) - 1) % len(f.fields))
 	}
-	var cmd tea.Cmd
-	f.inputs[f.field], cmd = f.inputs[f.field].Update(key)
-	f.err = ""
-	f.updatePreview()
-	return false, cmd
+	return false, nil
 }
 
 func (f *ruleForm) focus(i int) {
-	f.inputs[f.field].Blur()
+	f.fields[f.field].Blur()
 	f.field = i
-	f.inputs[f.field].Focus()
-	f.inputs[f.field].CursorEnd()
+	f.fields[f.field].Focus()
 }
 
 // updatePreview evaluates the "how much" field as it is typed, so a mistake in a
 // formula is caught while writing it rather than when money is about to move.
 func (f *ruleForm) updatePreview() {
 	f.preview = ""
-	text := strings.TrimSpace(f.inputs[2].Value())
+	text := strings.TrimSpace(f.fields[ruleFieldHowMuch].Value())
 	if text == "" {
 		return
 	}
@@ -240,12 +277,15 @@ func (f *ruleForm) evalPreview(formula string) string {
 
 func (f *ruleForm) save() error {
 	r := f.rule
-	r.Name = strings.TrimSpace(f.inputs[0].Value())
+	r.Name = strings.TrimSpace(f.fields[ruleFieldName].Value())
 	if r.Name == "" {
 		return fmt.Errorf("a rule needs a name")
 	}
 
-	acctName := strings.TrimSpace(f.inputs[1].Value())
+	if ok, why := f.fields[ruleFieldAccount].Valid(); !ok {
+		return fmt.Errorf("%s", why)
+	}
+	acctName := strings.TrimSpace(f.fields[ruleFieldAccount].Value())
 	acct, found, err := f.m.store.AccountByName(acctName)
 	if err != nil {
 		return err
@@ -255,17 +295,17 @@ func (f *ruleForm) save() error {
 	}
 	r.AccountID, r.Account = acct.ID, acct.Name
 
-	kind, basis, value, formula, err := parseHowMuch(f.inputs[2].Value())
+	kind, basis, value, formula, err := parseHowMuch(f.fields[ruleFieldHowMuch].Value())
 	if err != nil {
 		return err
 	}
 	r.Kind, r.Basis, r.Value, r.Formula = kind, basis, value, formula
 
 	r.Stage = plan.StageInvest
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(f.inputs[3].Value())), "s") {
+	if f.fields[ruleFieldStage].Value() == "set aside" {
 		r.Stage = plan.StageSetAside
 	}
-	fmt.Sscanf(strings.TrimSpace(f.inputs[4].Value()), "%d", &r.Priority)
+	fmt.Sscanf(strings.TrimSpace(f.fields[ruleFieldPriority].Value()), "%d", &r.Priority)
 	r.Active = true
 
 	_, err = f.m.store.SaveRule(r)
@@ -280,24 +320,21 @@ func (f *ruleForm) View(width, height int) string {
 	}
 	b.WriteString("\n  " + styHeading.Render(title) + "\n\n")
 
-	for i, in := range f.inputs {
-		style, marker := styFieldLabel, "  "
-		if i == f.field {
-			style, marker = styFieldActive, styKey.Render("▸ ")
-		}
-		b.WriteString(marker + style.Render(pad(ruleFields[i].label, 14, false)) + in.View() + "\n")
-		if i == 2 && f.preview != "" {
-			b.WriteString("    " + pad("", 14, false) + f.preview + "\n")
+	const labelW = 14
+	for i, fl := range f.fields {
+		b.WriteString(fl.View(labelW, i == f.field))
+		b.WriteString(fl.Extra(labelW+2, 6))
+		if i == ruleFieldHowMuch && f.preview != "" {
+			b.WriteString("    " + pad("", labelW, false) + f.preview + "\n")
 		}
 		if i == f.field {
-			b.WriteString("    " + pad("", 14, false) +
-				styFaint.Render(wrap(ruleFields[i].help, min(width-22, 62))) + "\n")
+			b.WriteString(fl.Help(labelW+2, width))
 		}
 	}
 	if f.err != "" {
 		b.WriteString("\n  " + styError.Render(f.err) + "\n")
 	}
-	if f.field == 2 {
+	if f.field == ruleFieldHowMuch {
 		b.WriteString("\n" + f.formulaHelp(width))
 	}
 	return b.String()

@@ -183,3 +183,45 @@ func TestParseIsReusable(t *testing.T) {
 		}
 	}
 }
+
+// suggestingBalances also reports what selectors exist.
+type suggestingBalances struct{ fakeBalances }
+
+func (s suggestingBalances) Selectors() []string {
+	return []string{"amex", "hdfc card", "spending", "tag:type=credit_card"}
+}
+
+// A selector that matches nothing must say what would have worked. The whole
+// difficulty with tag selectors is that the vocabulary is invisible until an
+// account carries the tag.
+func TestFailedSelectorSuggestsWhatExists(t *testing.T) {
+	env := &BaseEnv{Accounts: suggestingBalances{fakeBalances{"spending": 1}}}
+	_, err := Eval(`owed("tag:type=creditcard")`, env)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !strings.Contains(err.Error(), "tag:type=credit_card") {
+		t.Errorf("error should suggest the tag that does exist: %v", err)
+	}
+	// A tag miss should not be answered with a list of account names.
+	if strings.Contains(err.Error(), "hdfc card") {
+		t.Errorf("suggestions should match the shape of the selector: %v", err)
+	}
+}
+
+// The most likely first mistake: no account is tagged at all yet.
+func TestNoTagsAtAllExplainsHowToAddOne(t *testing.T) {
+	env := &BaseEnv{Accounts: untaggedBalances{}}
+	_, err := Eval(`owed("tag:type=credit_card")`, env)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !strings.Contains(err.Error(), "Accounts screen") {
+		t.Errorf("error should say where to add a tag: %v", err)
+	}
+}
+
+type untaggedBalances struct{}
+
+func (untaggedBalances) Balance(string) (*big.Rat, bool) { return nil, false }
+func (untaggedBalances) Selectors() []string             { return []string{"bank", "kind:asset"} }

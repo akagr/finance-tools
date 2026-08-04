@@ -93,6 +93,17 @@ Press `2`, type what came in, and the routing appears as you type:
 just for this month — which is how "no PPF this month" works without touching the
 rule.
 
+#### Filling in forms
+
+Fields only accept what is actually valid. A fixed set of values is a choice you
+cycle with `←`/`→` or space, with every option on screen; a reference to
+something that already exists — the destination account, a currency, a tag —
+completes as you type, with `↑`/`↓` to pick and `tab` to accept. Matching is on
+any part of the name, so `card` finds `HDFC Card`.
+
+A rule's destination is strict: it has to be an account that exists, because one
+pointing at a name that does not would fail silently every month.
+
 #### Rules
 
 Rules run in **priority order**, in two stages. *Set-asides* come off income
@@ -121,7 +132,9 @@ there:
 ```
 
 Selecting by tag rather than by name means a new credit card is covered the
-moment you tag it, with no rule to edit. Available to a formula:
+moment you tag it — so tag each card `type=credit_card` on the Accounts screen
+(they are accounts of kind `liability`), and the rule above needs no editing when
+you get another one. Available to a formula:
 
 - `income`, `setaside`, `investable`, `allocated`, `remaining`
 - `balance(sel…)` signed, `owed(sel…)` positive for debts, `line("rule name")`

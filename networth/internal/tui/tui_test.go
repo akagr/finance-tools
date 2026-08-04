@@ -655,7 +655,7 @@ func TestRuleEditorPreviewsAFormula(t *testing.T) {
 		t.Fatal("e did not open the rule editor")
 	}
 	// The "how much" field holds the formula, and its help must be visible.
-	p.editor.focus(2)
+	p.editor.focus(ruleFieldHowMuch)
 	out := m.View()
 	if !strings.Contains(out, "owed(") {
 		t.Errorf("the formula vocabulary should be on screen:\n%s", out)
@@ -752,5 +752,292 @@ func TestEscapeLeavesInputModeOnThePlanScreen(t *testing.T) {
 	press(t, m, "2", "i")
 	if !p.Capturing() {
 		t.Error("i should put the cursor back in the income field")
+	}
+}
+
+// Arbitrary tags must be settable from the Accounts screen. Formulas select
+// accounts by tag, so a tag that can only be added with raw SQL makes the
+// formula language unusable from the interface.
+func TestAccountFormSetsArbitraryTags(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "4")
+	press(t, m, "a")
+
+	s := m.screens[viewAccounts].(*accountsScreen)
+	if s.form == nil {
+		t.Fatal("a did not open the form")
+	}
+	typeText(t, m, "HDFC Card")
+	s.form.focus(1)
+	s.form.fields[1].SetValue("liability")
+	s.form.focus(6)
+	typeText(t, m, "type=credit_card, asset_class=debt")
+	press(t, m, "ctrl+s")
+
+	acct, found, err := m.store.AccountByName("HDFC Card")
+	if err != nil || !found {
+		t.Fatalf("account not saved: %v", err)
+	}
+	if acct.Tags["type"] != "credit_card" {
+		t.Errorf("tags = %v, want type=credit_card", acct.Tags)
+	}
+	if acct.Tags["asset_class"] != "debt" {
+		t.Errorf("tags = %v, want asset_class=debt", acct.Tags)
+	}
+	if acct.Kind != "liability" {
+		t.Errorf("kind = %q, want liability", acct.Kind)
+	}
+}
+
+// Once a card is tagged, the selector a formula uses must resolve.
+func TestTaggedCardMakesTheSelectorResolve(t *testing.T) {
+	m := newModel(t, true)
+	card, err := m.store.AddAccount(store.Account{Name: "HDFC Card", Kind: "liability",
+		Currency: "INR", InNetworth: true, Tags: map[string]string{"type": "credit_card"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.store.RecordUpdate("2026-01-01", []store.Entry{
+		{AccountID: card, Balance: money.FromMajor(-35000), Currency: "INR"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	bals, err := m.store.Balances()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, ok := bals.Balance("tag:type=credit_card")
+	if !ok {
+		t.Fatalf("tag:type=credit_card did not resolve; selectors are %v", bals.Selectors())
+	}
+	if v.RatString() != "-35000" {
+		t.Errorf("balance = %s, want -35000", v.RatString())
+	}
+}
+
+func TestTagFieldRejectsMalformedInput(t *testing.T) {
+	if _, err := parseTagField("type credit_card"); err == nil {
+		t.Error("a tag without = should be refused")
+	}
+	if _, err := parseTagField("type="); err == nil {
+		t.Error("a tag with no value should be refused")
+	}
+	got, err := parseTagField(" type=credit_card ,  owner=self ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["type"] != "credit_card" || got["owner"] != "self" {
+		t.Errorf("parsed = %v", got)
+	}
+	if formatTags(got) != "owner=self, type=credit_card" {
+		t.Errorf("formatTags = %q", formatTags(got))
+	}
+}
+
+func TestChoiceFieldCyclesAndShowsEveryOption(t *testing.T) {
+	f := newChoiceField("Kind", "", []string{"asset", "liability", "income"})
+	if f.Value() != "asset" {
+		t.Errorf("initial value = %q, want asset", f.Value())
+	}
+	// Every valid value is on screen, so there is nothing to look up.
+	out := f.View(10, true)
+	for _, want := range []string{"asset", "liability", "income"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("choice field should show %q:\n%s", want, out)
+		}
+	}
+	f.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if f.Value() != "liability" {
+		t.Errorf("after right = %q, want liability", f.Value())
+	}
+	f.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if f.Value() != "asset" {
+		t.Errorf("after left = %q, want asset", f.Value())
+	}
+	// Typing the first letter jumps, which is faster than cycling.
+	f.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if f.Value() != "income" {
+		t.Errorf("after typing i = %q, want income", f.Value())
+	}
+	// Cycling must wrap rather than dead-end.
+	f.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if f.Value() != "asset" {
+		t.Errorf("cycling past the end = %q, want it to wrap to asset", f.Value())
+	}
+	// Tab belongs to the form: a choice field must not steal it, or moving
+	// through a form would behave differently depending on the field.
+	if handled, _ := f.Update(tea.KeyMsg{Type: tea.KeyTab}); handled {
+		t.Error("tab should pass through to the form, not cycle the choice")
+	}
+}
+
+// A text field must not swallow the keys that move between fields, or the form
+// traps the cursor on whichever field it started on.
+func TestTextFieldPassesNavigationKeysThrough(t *testing.T) {
+	f := newTextField("Name", "")
+	f.Focus()
+	for _, k := range []tea.KeyType{tea.KeyTab, tea.KeyDown, tea.KeyUp, tea.KeyEnter, tea.KeyEsc} {
+		if handled, _ := f.Update(tea.KeyMsg{Type: k}); handled {
+			t.Errorf("%v should pass through to the form", k)
+		}
+	}
+	if handled, _ := f.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}); !handled {
+		t.Error("ordinary typing should be consumed by the field")
+	}
+}
+
+// Moving through every field and back must be possible with tab alone.
+func TestFormTabsThroughEveryField(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "4")
+	press(t, m, "a")
+	s := m.screens[viewAccounts].(*accountsScreen)
+
+	n := len(s.form.fields)
+	for i := 1; i < n; i++ {
+		press(t, m, "tab")
+		if s.form.field != i {
+			t.Fatalf("after %d tabs the cursor is on field %d, want %d", i, s.form.field, i)
+		}
+	}
+	press(t, m, "tab")
+	if s.form.field != 0 {
+		t.Errorf("tab past the last field = %d, want it to wrap to 0", s.form.field)
+	}
+}
+
+func TestSuggestFieldFiltersAndAccepts(t *testing.T) {
+	f := newSuggestField("To account", "",
+		[]string{"HDFC Card", "Salary Account", "Spending Account", "Tax FD"}, true)
+	f.Focus()
+
+	// Matching anywhere, not just at the start, is what makes "card" find
+	// "HDFC Card".
+	for _, r := range "card" {
+		f.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	if len(f.matches) != 1 || f.matches[0] != "HDFC Card" {
+		t.Errorf("matches = %v, want [HDFC Card]", f.matches)
+	}
+	if !f.open {
+		t.Error("the list should be open while typing")
+	}
+	f.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if f.Value() != "HDFC Card" {
+		t.Errorf("after tab = %q, want the completed name", f.Value())
+	}
+	if f.open {
+		t.Error("accepting should close the list")
+	}
+}
+
+func TestSuggestFieldArrowsPickFromTheList(t *testing.T) {
+	f := newSuggestField("To account", "",
+		[]string{"Salary Account", "Spending Account"}, true)
+	f.Focus()
+	for _, r := range "acc" {
+		f.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	f.Update(tea.KeyMsg{Type: tea.KeyDown})
+	f.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if f.Value() != "Spending Account" {
+		t.Errorf("value = %q, want the second match", f.Value())
+	}
+}
+
+// A strict field must refuse a value that is not on the list, because a rule
+// pointing at an account that does not exist would fail silently every month.
+func TestStrictSuggestFieldRejectsUnknownValues(t *testing.T) {
+	f := newSuggestField("To account", "", []string{"Tax FD"}, true)
+	f.SetValue("Tax FDD")
+	if ok, why := f.Valid(); ok {
+		t.Error("a value not on the list should be refused")
+	} else if why == "" {
+		t.Error("the refusal should explain itself")
+	}
+	f.SetValue("Tax FD")
+	if ok, _ := f.Valid(); !ok {
+		t.Error("an exact match should be accepted")
+	}
+}
+
+// A non-strict field is a suggestion, not a constraint: a new currency has to be
+// possible.
+func TestNonStrictSuggestFieldAcceptsNewValues(t *testing.T) {
+	f := newSuggestField("Currency", "", []string{"INR", "USD"}, false)
+	f.SetValue("SGD")
+	if ok, _ := f.Valid(); !ok {
+		t.Error("a suggestion field should not block a new value")
+	}
+}
+
+// The rule editor must offer the accounts rather than asking for an exact name.
+func TestRuleFormCompletesTheDestinationAccount(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+	press(t, m, "ctrl+r")
+	press(t, m, "a")
+
+	p := m.screens[viewPlan].(*planScreen)
+	if p.editor == nil {
+		t.Fatal("a did not open the rule editor")
+	}
+	p.editor.focus(ruleFieldAccount)
+	typeText(t, m, "tax")
+
+	out := m.View()
+	if !strings.Contains(out, "Tax FD") {
+		t.Errorf("the destination field should complete against real accounts:\n%s", out)
+	}
+	press(t, m, "tab")
+	if got := p.editor.fields[ruleFieldAccount].Value(); got != "Tax FD" {
+		t.Errorf("accepted value = %q, want Tax FD", got)
+	}
+}
+
+// The account kind must be a choice, not a spelling test.
+func TestAccountFormKindIsAChoice(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "4")
+	press(t, m, "a")
+	s := m.screens[viewAccounts].(*accountsScreen)
+
+	s.form.focus(1)
+	out := m.View()
+	for _, want := range []string{"asset", "liability", "income", "expense", "equity"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("kind field should show %q as an option:\n%s", want, out)
+		}
+	}
+	press(t, m, "right")
+	if got := s.form.fields[1].Value(); got != "liability" {
+		t.Errorf("after right, kind = %q, want liability", got)
+	}
+}
+
+// Tags already in use should be offered, so a convention spreads without having
+// to be remembered.
+func TestTagFieldSuggestsExistingTags(t *testing.T) {
+	m := newModel(t, true)
+	if _, err := m.store.AddAccount(store.Account{Name: "Amex", Kind: "liability",
+		Currency: "INR", InNetworth: true,
+		Tags: map[string]string{"type": "credit_card"}}); err != nil {
+		t.Fatal(err)
+	}
+	press(t, m, "4")
+	press(t, m, "a")
+	s := m.screens[viewAccounts].(*accountsScreen)
+
+	found := false
+	for _, o := range s.form.fields[6].options {
+		if o == "type=credit_card" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("tag suggestions should include tags already in use: %v",
+			s.form.fields[6].options)
 	}
 }
