@@ -16,18 +16,56 @@ type hint struct {
 	desc string
 }
 
-// footer renders the contextual keybindings.
+// footer renders the contextual keybindings on the left and the ones that get
+// you out on the right.
 //
 // It is always visible and always reflects the current screen. That is the
 // deliberate answer to discoverability: the interface should never depend on the
 // user having read documentation or memorised a key.
-func footer(width int, hints []hint) string {
+//
+// Two rules keep that promise at any width. The globals live in their own column
+// on the right, so a crowded screen never truncates the way out. And when the
+// contextual hints have to be trimmed, the last one is kept: by convention it is
+// the one that backs out or cancels, which is the worst one to leave a user
+// guessing about.
+func footer(width int, hints, globals []hint) string {
+	right := joinHints(globals)
+	rightW := lipgloss.Width(right)
+
+	layout := func(left string) string {
+		gap := max(1, width-lipgloss.Width(left)-rightW)
+		return left + strings.Repeat(" ", gap) + right
+	}
+	if len(hints) == 0 {
+		return layout("")
+	}
+
+	head, last := hints[:len(hints)-1], hints[len(hints)-1]
+	for n := len(head); ; n-- {
+		left := joinHints(head[:n])
+		if n < len(head) {
+			if n > 0 {
+				left += styFaint.Render("  ·  ") + styFaint.Render("…")
+			} else {
+				left = styFaint.Render("…")
+			}
+		}
+		if left != "" {
+			left += styFaint.Render("  ·  ")
+		}
+		left += joinHints([]hint{last})
+		if lipgloss.Width(left)+2+rightW <= width || n == 0 {
+			return layout(left)
+		}
+	}
+}
+
+func joinHints(hints []hint) string {
 	var parts []string
 	for _, h := range hints {
 		parts = append(parts, styKey.Render(h.key)+" "+styKeyDesc.Render(h.desc))
 	}
-	line := strings.Join(parts, styFaint.Render("  ·  "))
-	return lipgloss.NewStyle().Width(width).Render(line)
+	return strings.Join(parts, styFaint.Render("  ·  "))
 }
 
 // fmtMoney renders an amount with the database's own grouping preference.

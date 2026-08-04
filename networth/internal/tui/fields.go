@@ -192,6 +192,11 @@ func (f *field) Update(key tea.KeyMsg) (bool, tea.Cmd) {
 				return true, nil
 			}
 			return false, nil
+		case "shift+tab":
+			// Never a text key, and there is nothing to go back to within the
+			// field, so it always means "previous field". Falling through to the
+			// input below would swallow it and strand the cursor.
+			return false, nil
 		case "enter":
 			if f.open && len(f.matches) > 0 {
 				f.accept()

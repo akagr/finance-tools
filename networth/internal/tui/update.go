@@ -155,8 +155,18 @@ func (u *updateScreen) focusField() {
 	}
 }
 
-func (u *updateScreen) Capturing() bool {
-	return u.phase == phaseEntry || u.phase == phaseDate
+func (u *updateScreen) Focus() focusLevel {
+	if len(u.accounts) == 0 {
+		return focusIdle
+	}
+	switch u.phase {
+	case phaseReview:
+		// Not typing, but an unsaved round is on screen: a bare q here would
+		// quit and throw it away.
+		return focusBusy
+	default:
+		return focusTyping
+	}
 }
 
 func (u *updateScreen) Hints() []hint {
@@ -164,15 +174,22 @@ func (u *updateScreen) Hints() []hint {
 	case phaseDate:
 		return []hint{{"↵", "confirm date"}, {"esc", "back"}}
 	case phaseReview:
-		return []hint{{"↵", "save"}, {"e", "back to editing"}, {"esc", "cancel"}}
+		return []hint{{"↵", "save"}, {"e", "back to editing"}, {"esc", "back to editing"}}
 	default:
+		// esc is the only bare key that leaves this screen, so it says what it
+		// will do rather than the ambiguous "cancel": the outcome should be
+		// legible before the key is pressed, not after.
+		leave := hint{"esc", "leave this round"}
+		if u.dirty() || u.pendingInput() {
+			leave = hint{"esc", "discard this round"}
+		}
 		return []hint{
 			{"↵", "next"},
 			{"⇥", "balance / added"},
-			{"↑↓", "move"},
-			{"ctrl+s", "review & save"},
+			{"↑↓", "account"},
+			{"ctrl+s", "save"},
 			{"ctrl+d", "date"},
-			{"esc", "cancel"},
+			leave,
 		}
 	}
 }
@@ -224,7 +241,11 @@ func (u *updateScreen) updateEntry(key tea.KeyMsg) tea.Cmd {
 
 	switch key.String() {
 	case "esc":
-		if u.dirty() && !u.confirmCancel {
+		// A figure that has been typed counts as work even before it is
+		// confirmed with enter. Without this, esc looks like it discards
+		// nothing and quietly throws away what is on screen - which is exactly
+		// what makes leaving the round feel like the screen jumped on its own.
+		if (u.dirty() || u.pendingInput()) && !u.confirmCancel {
 			u.confirmCancel = true
 			u.fieldErr = "esc again to discard this round"
 			return nil
@@ -376,6 +397,15 @@ func (u *updateScreen) dirty() bool {
 		}
 	}
 	return false
+}
+
+// pendingInput reports whether something has been typed into the focused field
+// but not yet confirmed. It is deliberately separate from dirty: saving must
+// only ever act on committed figures, while leaving must account for uncommitted
+// ones too.
+func (u *updateScreen) pendingInput() bool {
+	return strings.TrimSpace(u.balanceInput.Value()) != "" ||
+		strings.TrimSpace(u.addedInput.Value()) != ""
 }
 
 func (u *updateScreen) reset() {

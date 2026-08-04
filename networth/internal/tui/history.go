@@ -40,7 +40,7 @@ func (h *historyScreen) Refresh() error {
 	return nil
 }
 
-func (h *historyScreen) Capturing() bool { return false }
+func (h *historyScreen) Focus() focusLevel { return focusIdle }
 
 func (h *historyScreen) Hints() []hint {
 	return []hint{{"↑↓", "period"}}
