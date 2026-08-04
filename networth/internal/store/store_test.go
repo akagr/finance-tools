@@ -301,3 +301,34 @@ func TestEmptyDatabaseSummarisesWithoutError(t *testing.T) {
 		t.Errorf("expected an empty summary, got %+v", sum)
 	}
 }
+
+// A first round of balances must report a net worth and nothing else. Showing a
+// return derived from one measurement would be a fabricated number on the very
+// first screen a new user sees.
+func TestSingleValuationReportsNoReturn(t *testing.T) {
+	s := newStore(t)
+	bank := addAccount(t, s, "Bank", true)
+	fund := addAccount(t, s, "Fund", true)
+
+	if err := s.RecordUpdate("2026-08-04", []Entry{
+		{AccountID: bank, Balance: money.FromMajor(250000), Currency: "INR"},
+		{AccountID: fund, Balance: money.FromMajor(400000), Currency: "INR"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	sum, err := s.Summarise("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := sum.NetWorth, money.FromMajor(650000); got != want {
+		t.Errorf("net worth = %s, want %s", got, want)
+	}
+	if sum.HasXIRR {
+		t.Errorf("reported a money-weighted return of %.1f%% from a single valuation", sum.XIRR*100)
+	}
+	if sum.HasTWR {
+		t.Errorf("reported a time-weighted return of %.1f%% from a single valuation",
+			sum.TWR.Annualised*100)
+	}
+}

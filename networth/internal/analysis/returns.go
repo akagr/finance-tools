@@ -77,6 +77,15 @@ func XIRR(flows []Cashflow) (float64, error) {
 	}
 
 	t0 := cf[0].Date
+	// Cashflows that all fall on the same date carry no information about a
+	// rate: the net present value is identical at every rate, so a solver will
+	// happily return whatever it started from. Refusing is the only honest
+	// answer, and this is not a corner case - it is exactly what a first round
+	// of balances looks like, before there is any history to measure.
+	if !cf[len(cf)-1].Date.After(t0) {
+		return 0, ErrNoSolution
+	}
+
 	npv := func(rate float64) float64 {
 		var sum float64
 		for _, f := range cf {
@@ -89,6 +98,11 @@ func XIRR(flows []Cashflow) (float64, error) {
 	lo, hi := -0.9999, 10.0
 	flo, fhi := npv(lo), npv(hi)
 	if math.IsNaN(flo) || math.IsNaN(fhi) {
+		return 0, ErrNoSolution
+	}
+	// The same degeneracy can arise from flows that cancel exactly at every
+	// rate. A root that exists everywhere is not a return.
+	if math.Abs(flo) < 1e-9 && math.Abs(fhi) < 1e-9 {
 		return 0, ErrNoSolution
 	}
 	// Widen the upper bracket for extraordinary returns before giving up.

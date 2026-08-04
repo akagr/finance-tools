@@ -125,7 +125,15 @@ func (s *Store) Summarise(since string) (Summary, error) {
 }
 
 // fillReturns computes both return measures over the reporting window.
+//
+// Both are skipped entirely when the window has no width. A single round of
+// balances describes a moment, not a period, and any return derived from it
+// would be an artefact of the solver rather than a fact about the portfolio.
 func (out *Summary) fillReturns(s *Store, vals []string, start, latest string, flows []Flow) {
+	if start == "" || start >= latest {
+		return
+	}
+
 	// Money-weighted: the opening value and every contribution are outflows from
 	// the investor, the closing value is the inflow that settles them.
 	cfs := []analysis.Cashflow{}
