@@ -28,15 +28,19 @@ import (
 
 type view int
 
+// Screens are ordered by how often they are used, not by any conceptual
+// hierarchy: planning happens monthly, balances are updated a couple of times a
+// year, and accounts are set up once.
 const (
 	viewDashboard view = iota
+	viewPlan
 	viewUpdate
 	viewAccounts
 	viewHistory
 	viewQuery
 )
 
-var viewNames = []string{"Dashboard", "Update", "Accounts", "History", "Query"}
+var viewNames = []string{"Dashboard", "Plan", "Update", "Accounts", "History", "Query"}
 
 // screen is one tab of the interface.
 type screen interface {
@@ -92,6 +96,7 @@ func New(s *store.Store, path string, firstRun bool) (*Model, error) {
 	m := &Model{store: s, settings: settings, path: path, firstRun: firstRun}
 	m.screens = []screen{
 		newDashboard(m),
+		newPlanScreen(m),
 		newUpdateScreen(m),
 		newAccountsScreen(m),
 		newHistoryScreen(m),
@@ -223,7 +228,7 @@ func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
 	case "shift+tab", "ctrl+left":
 		m.prevView()
 		return nil, true
-	case "1", "2", "3", "4", "5":
+	case "1", "2", "3", "4", "5", "6":
 		n := int(key.String()[0] - '1')
 		if n < len(m.screens) {
 			m.active = view(n)
@@ -337,6 +342,14 @@ func (m *Model) helpView() string {
 			{"u", "start a balance update"},
 			{"p", "change the period being compared"},
 		}},
+		{"Plan (monthly)", []hint{
+			{"type an amount", "the routing updates as you type"},
+			{"↑ ↓ then enter", "override one line for this month"},
+			{"ctrl+s", "save and record where the money went"},
+			{"ctrl+r", "edit the routing rules"},
+			{"ctrl+d", "change the month"},
+			{"ctrl+z", "undo a month you already recorded"},
+		}},
 		{"Update", []hint{
 			{"enter", "confirm the field and move on"},
 			{"tab", "switch between balance and amount added"},
@@ -366,6 +379,13 @@ func (m *Model) helpView() string {
 		}
 		b.WriteString("\n")
 	}
+
+	b.WriteString(styHeading.Render("Two rhythms") + "\n")
+	b.WriteString(styMuted.Render(wrap(
+		"Plan monthly, update balances a couple of times a year. The monthly plan is what "+
+			"makes the rest accurate: recording where income went means contributions are a "+
+			"record rather than a recollection, so the split between what you added and what "+
+			"you earned can be trusted.", min(m.width-2, 76))) + "\n\n")
 
 	b.WriteString(styHeading.Render("Typing amounts") + "\n")
 	b.WriteString(styMuted.Render(wrap(

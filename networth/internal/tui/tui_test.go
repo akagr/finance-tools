@@ -7,6 +7,7 @@ import (
 
 	"github.com/akagr/finance-tools/networth/internal/db"
 	"github.com/akagr/finance-tools/networth/internal/money"
+	"github.com/akagr/finance-tools/networth/internal/plan"
 	"github.com/akagr/finance-tools/networth/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -165,9 +166,9 @@ func TestFirstRunStartsOnAccounts(t *testing.T) {
 
 func TestNumberKeysSwitchScreens(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "3")
+	press(t, m, "4")
 	if m.active != viewAccounts {
-		t.Errorf("pressing 3 went to %s, want Accounts", viewNames[m.active])
+		t.Errorf("pressing 4 went to %s, want Accounts", viewNames[m.active])
 	}
 	press(t, m, "1")
 	if m.active != viewDashboard {
@@ -194,7 +195,7 @@ func TestHelpOverlayOpensAndCloses(t *testing.T) {
 // the field. Typing "quit" into a balance should not quit.
 func TestTypingDoesNotTriggerGlobalShortcuts(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "2")
+	press(t, m, "3")
 	if m.active != viewUpdate {
 		t.Fatalf("expected the update screen, got %s", viewNames[m.active])
 	}
@@ -212,7 +213,7 @@ func TestTypingDoesNotTriggerGlobalShortcuts(t *testing.T) {
 // enter, review, save.
 func TestUpdateRoundSavesBalancesAndContributions(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "2")
+	press(t, m, "3")
 	u := m.screens[viewUpdate].(*updateScreen)
 	u.date = "2026-01-01"
 
@@ -260,7 +261,7 @@ func TestUpdateRoundSavesBalancesAndContributions(t *testing.T) {
 // thought of rather than pre-computed elsewhere.
 func TestUpdateFieldEvaluatesArithmetic(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "2")
+	press(t, m, "3")
 	u := m.screens[viewUpdate].(*updateScreen)
 	u.date = "2026-01-01"
 
@@ -280,7 +281,7 @@ func TestUpdateFieldEvaluatesArithmetic(t *testing.T) {
 // not moved is skipped without ceremony.
 func TestBlankBalanceLeavesAnAccountAlone(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "2")
+	press(t, m, "3")
 	u := m.screens[viewUpdate].(*updateScreen)
 
 	press(t, m, "enter") // blank balance
@@ -297,7 +298,7 @@ func TestBlankBalanceLeavesAnAccountAlone(t *testing.T) {
 // A mistyped amount must be caught while typing, not swallowed and saved.
 func TestInvalidAmountIsReportedNotSaved(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "2")
+	press(t, m, "3")
 	u := m.screens[viewUpdate].(*updateScreen)
 
 	typeText(t, m, "abc")
@@ -318,7 +319,7 @@ func TestInvalidAmountIsReportedNotSaved(t *testing.T) {
 // twice a year.
 func TestCancellingAPartialRoundAsksTwice(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "2")
+	press(t, m, "3")
 	u := m.screens[viewUpdate].(*updateScreen)
 
 	typeText(t, m, "500000")
@@ -339,7 +340,7 @@ func TestCancellingAPartialRoundAsksTwice(t *testing.T) {
 
 func TestAccountsScreenAddsAnAccount(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "3")
+	press(t, m, "4")
 	press(t, m, "a")
 
 	s := m.screens[viewAccounts].(*accountsScreen)
@@ -367,7 +368,7 @@ func TestAccountsScreenAddsAnAccount(t *testing.T) {
 
 func TestHistoryShowsPerPeriodAttribution(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "4")
+	press(t, m, "5")
 	out := m.View()
 	for _, want := range []string{"From", "You added", "Earned"} {
 		if !strings.Contains(out, want) {
@@ -378,7 +379,7 @@ func TestHistoryShowsPerPeriodAttribution(t *testing.T) {
 
 func TestQueryScreenRunsASavedQuery(t *testing.T) {
 	m := newModel(t, true)
-	press(t, m, "5")
+	press(t, m, "6")
 	q := m.screens[viewQuery].(*queryScreen)
 	if len(q.queries) == 0 {
 		t.Fatal("no saved queries were listed")
@@ -419,7 +420,7 @@ func TestLiabilityEnteredPositiveIsStoredAsDebt(t *testing.T) {
 		Name: "Home loan", Kind: "liability", Currency: "INR", InNetworth: true}); err != nil {
 		t.Fatal(err)
 	}
-	press(t, m, "2")
+	press(t, m, "3")
 	u := m.screens[viewUpdate].(*updateScreen)
 	u.date = "2026-01-01"
 
@@ -461,5 +462,295 @@ func TestLiabilityEnteredNegativeIsLeftAlone(t *testing.T) {
 	asset := store.Account{Kind: "asset"}
 	if got := normaliseForKind(asset, money.FromMajor(500)); got != money.FromMajor(500) {
 		t.Errorf("an asset must never be negated: got %s", got)
+	}
+}
+
+// setupPlanRules gives the model the shape of a real routing sheet.
+func setupPlanRules(t *testing.T, m *Model) map[string]int64 {
+	t.Helper()
+	ids := map[string]int64{}
+	for _, a := range []struct {
+		name, kind string
+		tags       map[string]string
+	}{
+		{"Salary Account", "asset", nil},
+		{"Spending Account", "asset", nil},
+		{"HDFC Card", "liability", map[string]string{"type": "credit_card"}},
+		{"Tax FD", "asset", nil},
+	} {
+		id, err := m.store.AddAccount(store.Account{Name: a.name, Kind: a.kind,
+			Currency: "INR", InNetworth: true, Tags: a.tags})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids[a.name] = id
+	}
+	if err := m.store.SetIncomeAccount(ids["Salary Account"]); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.store.RecordUpdate("2026-01-01", []store.Entry{
+		{AccountID: ids["Spending Account"], Balance: money.FromMajor(12000), Currency: "INR"},
+		{AccountID: ids["HDFC Card"], Balance: money.FromMajor(-43000), Currency: "INR"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range []plan.Rule{
+		{Name: "Top up spending", AccountID: ids["Spending Account"],
+			Stage: plan.StageSetAside, Kind: plan.KindFormula, Priority: 1, Active: true,
+			Formula: `100000 + owed("tag:type=credit_card") - balance("Spending Account")`},
+		{Name: "Tax FD", AccountID: ids["Tax FD"], Stage: plan.StageInvest,
+			Kind: plan.KindFixed, Value: money.FromMajor(50000), Priority: 2, Active: true},
+		{Name: "Flexi Cap Fund", AccountID: 0, Stage: plan.StageInvest,
+			Kind: plan.KindRemainder, Priority: 9, Active: true},
+	} {
+		if r.AccountID == 0 {
+			acct, found, err := m.store.AccountByName("Flexi Cap Fund")
+			if err != nil || !found {
+				t.Fatal("expected the seeded fund account")
+			}
+			r.AccountID = acct.ID
+		}
+		if _, err := m.store.SaveRule(r); err != nil {
+			t.Fatalf("saving %s: %v", r.Name, err)
+		}
+	}
+	for _, sc := range m.screens {
+		if err := sc.Refresh(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return ids
+}
+
+// The routing must update as the income is typed. That immediacy is what makes
+// this feel like the spreadsheet it replaces.
+func TestPlanRecomputesAsIncomeIsTyped(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+	if m.active != viewPlan {
+		t.Fatalf("pressing 2 went to %s, want Plan", viewNames[m.active])
+	}
+
+	typeText(t, m, "300000")
+	out := m.View()
+	// 1,00,000 spending + 43,000 owed - 12,000 already there.
+	if !strings.Contains(out, "1,31,000") {
+		t.Errorf("the formula rule did not resolve against real balances:\n%s", out)
+	}
+	if !strings.Contains(out, "50,000") {
+		t.Errorf("the fixed tax deposit is missing:\n%s", out)
+	}
+	// 3,00,000 - 1,31,000 - 50,000 sweeps into the fund.
+	if !strings.Contains(out, "1,19,000") {
+		t.Errorf("the remainder did not sweep up:\n%s", out)
+	}
+}
+
+func TestPlanSavesAndRecordsTheMonth(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+
+	p := m.screens[viewPlan].(*planScreen)
+	p.date = "2026-02-01"
+	typeText(t, m, "300000")
+	press(t, m, "ctrl+s")
+
+	saved, found, err := m.store.PlanFor("2026-02-01")
+	if err != nil || !found {
+		t.Fatalf("the plan was not saved: %v", err)
+	}
+	if !saved.Executed {
+		t.Error("saving should also record where the money went")
+	}
+
+	// The contributions are now on record, which is the whole point.
+	rec, err := m.store.RecordedContributions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var total money.Amount
+	for _, v := range rec {
+		total += v
+	}
+	if total == 0 {
+		t.Error("executing a plan should record contributions against accounts")
+	}
+}
+
+// Recording a month twice would double that month's income, so it must be
+// undoable rather than merely refused.
+func TestPlanCanBeUndone(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+
+	p := m.screens[viewPlan].(*planScreen)
+	p.date = "2026-02-01"
+	typeText(t, m, "300000")
+	press(t, m, "ctrl+s")
+	press(t, m, "ctrl+z")
+
+	saved, found, err := m.store.PlanFor("2026-02-01")
+	if err != nil || !found {
+		t.Fatal("the plan itself should survive an undo")
+	}
+	if saved.Executed {
+		t.Error("ctrl+z should return the month to a draft")
+	}
+}
+
+// Overriding one line for a single month - "no PPF this month" - must not
+// require editing the standing rule.
+func TestPlanLineCanBeOverriddenForOneMonth(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+
+	p := m.screens[viewPlan].(*planScreen)
+	typeText(t, m, "300000")
+
+	// Move to the tax deposit line and set it to zero for this month.
+	for i, l := range p.result.Lines {
+		if l.Label == "Tax FD" {
+			p.cursor = i
+		}
+	}
+	press(t, m, "enter")
+	press(t, m, "ctrl+u")
+	typeText(t, m, "0")
+	press(t, m, "enter")
+
+	for _, l := range p.result.Lines {
+		if l.Label == "Tax FD" && l.Amount != 0 {
+			t.Errorf("tax FD = %s, want the override of 0", l.Amount)
+		}
+		// The remainder must grow to keep the plan balanced.
+		if l.Label == "Flexi Cap Fund" && l.Amount != money.FromMajor(169000) {
+			t.Errorf("remainder = %s, want 1,69,000 after skipping the deposit", l.Amount)
+		}
+	}
+}
+
+// The rule editor must accept a formula and show what it currently evaluates to,
+// because seeing the number is the only reliable check that it says what was
+// meant.
+func TestRuleEditorPreviewsAFormula(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+	press(t, m, "ctrl+r")
+
+	p := m.screens[viewPlan].(*planScreen)
+	if p.mode != planRules {
+		t.Fatal("ctrl+r did not open the rules")
+	}
+	if !strings.Contains(m.View(), "Top up spending") {
+		t.Errorf("the rules list did not render:\n%s", m.View())
+	}
+
+	press(t, m, "e")
+	if p.editor == nil {
+		t.Fatal("e did not open the rule editor")
+	}
+	// The "how much" field holds the formula, and its help must be visible.
+	p.editor.focus(2)
+	out := m.View()
+	if !strings.Contains(out, "owed(") {
+		t.Errorf("the formula vocabulary should be on screen:\n%s", out)
+	}
+	if !strings.Contains(out, "1,31,000") {
+		t.Errorf("the formula preview should show what it comes to now:\n%s", out)
+	}
+}
+
+func TestParseHowMuchCoversEveryRuleShape(t *testing.T) {
+	cases := []struct {
+		in    string
+		kind  plan.Kind
+		basis plan.Basis
+	}{
+		{"50000", plan.KindFixed, plan.BasisInvestable},
+		{"12,500", plan.KindFixed, plan.BasisInvestable},
+		{"40%", plan.KindPercent, plan.BasisRemaining},
+		{"40% of income", plan.KindPercent, plan.BasisIncome},
+		{"40% of investable", plan.KindPercent, plan.BasisInvestable},
+		{"40% of the rest", plan.KindPercent, plan.BasisRemaining},
+		{"remainder", plan.KindRemainder, plan.BasisInvestable},
+		{`100000 - balance("Spending Account")`, plan.KindFormula, plan.BasisInvestable},
+		{"remaining / 2", plan.KindFormula, plan.BasisInvestable},
+	}
+	for _, c := range cases {
+		kind, basis, _, _, err := parseHowMuch(c.in)
+		if err != nil {
+			t.Errorf("parseHowMuch(%q): %v", c.in, err)
+			continue
+		}
+		if kind != c.kind {
+			t.Errorf("parseHowMuch(%q) kind = %s, want %s", c.in, kind, c.kind)
+		}
+		if kind == plan.KindPercent && basis != c.basis {
+			t.Errorf("parseHowMuch(%q) basis = %s, want %s", c.in, basis, c.basis)
+		}
+	}
+	if _, _, _, _, err := parseHowMuch("100000 + ("); err == nil {
+		t.Error("a broken formula should be refused as it is typed")
+	}
+}
+
+// Once a monthly plan has recorded a contribution, the balance round must say so
+// rather than inviting the same figure to be entered again.
+func TestUpdateScreenShowsAlreadyRecordedContributions(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+	p := m.screens[viewPlan].(*planScreen)
+	p.date = "2026-02-01"
+	typeText(t, m, "300000")
+	press(t, m, "ctrl+s")
+
+	press(t, m, "esc", "3")
+	u := m.screens[viewUpdate].(*updateScreen)
+	for i, a := range u.accounts {
+		if a.Name == "Tax FD" {
+			u.idx = i
+			u.syncInputs()
+		}
+	}
+	out := m.View()
+	if !strings.Contains(out, "already recorded") {
+		t.Errorf("the update screen should say the contribution is already on record:\n%s", out)
+	}
+}
+
+// A text field must never trap the cursor: esc always hands the number keys back
+// to navigation, or there is no way off the screen.
+func TestEscapeLeavesInputModeOnThePlanScreen(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+
+	p := m.screens[viewPlan].(*planScreen)
+	if !p.Capturing() {
+		t.Fatal("the income field should have focus on arrival")
+	}
+	typeText(t, m, "300000")
+
+	press(t, m, "esc")
+	if p.Capturing() {
+		t.Fatal("esc should have left input mode")
+	}
+	if !strings.Contains(m.View(), "i") {
+		t.Error("the footer should offer a way back into the field")
+	}
+	press(t, m, "4")
+	if m.active != viewAccounts {
+		t.Errorf("after esc, 4 should navigate; went to %s", viewNames[m.active])
+	}
+
+	press(t, m, "2", "i")
+	if !p.Capturing() {
+		t.Error("i should put the cursor back in the income field")
 	}
 }

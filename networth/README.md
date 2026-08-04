@@ -29,6 +29,13 @@ to tell a good year from a generous one.
 
 Run `networth` with no arguments and it opens there.
 
+It replaces two spreadsheets, not one. The **monthly** sheet works out where
+income goes; the **twice-yearly** one records balances. Keeping both in one place
+is what makes the numbers above trustworthy: routing income monthly means
+contributions are a *record* rather than a recollection, and twelve known
+cashflow dates a year instead of two sharpens every return figure that rests on
+them.
+
 > Not financial advice. Every figure is a draft to check, and the audit trail
 > exists so it can be checked.
 
@@ -44,6 +51,8 @@ go build -o networth ./cmd/networth
 ```sh
 networth                       # the interface — this is the normal way to use it
 networth --db ~/mine.db        # or point it at any file; created if missing
+networth plan --income 300000  # where should this month's money go?
+networth plan --rules          # the standing routing rules
 networth report                # a summary on stdout
 networth report --format md    # or markdown, csv, json
 networth query attribution     # run a saved query
@@ -55,6 +64,91 @@ networth backup                # a safe, atomic copy
 
 The database is found in this order: `--db`, then `$NETWORTH_DB`, then
 `./networth.db` if it exists, then `~/.local/share/networth/networth.db`.
+
+### The monthly routine
+
+Press `2`, type what came in, and the routing appears as you type:
+
+```
+  Monthly plan                                                    2026-08-01
+
+  Income        300000
+                = ₹3,00,000
+
+  Move                          To                              Amount
+▸ Top up spending               Spending Account             ₹1,31,000  set aside
+  Tax FD                        Tax FD                         ₹50,000
+  Domestic Equity               Domestic Equity                ₹59,500
+  Global Equity                 Global Equity                  ₹23,800
+  Debt Fund                     Debt Fund                      ₹17,850
+  Arbitrage                     Arbitrage                      ₹17,850
+
+  Set aside               ₹1,31,000
+  To invest               ₹1,69,000
+  56% of income routed to investments
+  net worth this month +₹3,00,000   nothing left your accounts yet
+```
+
+`ctrl+s` records it. `ctrl+z` undoes a month. `enter` on any line overrides it
+just for this month — which is how "no PPF this month" works without touching the
+rule.
+
+#### Rules
+
+Rules run in **priority order**, in two stages. *Set-asides* come off income
+first; whatever survives is what there is to invest, and the *invest* rules
+divide it. Because they run in order, a rule sees what the earlier ones left — so
+"50,000 to the tax deposit, then split the rest" works as written.
+
+One field says how much, and it takes whichever form fits:
+
+| You write | It means |
+|---|---|
+| `50000` | a fixed amount |
+| `40%` | 40% of what is still unallocated |
+| `40% of income` | 40% of gross income |
+| `40% of investable` | 40% of income less the set-asides |
+| `remainder` | whatever the other rules leave |
+| anything else | a formula |
+
+Formulas exist because real routing refers to *other accounts*. If income lands
+in one bank account but you spend from another, the transfer has to cover next
+month's spending plus what is owed on the cards, less whatever is already sitting
+there:
+
+```
+100000 + owed("tag:type=credit_card") - balance("Spending Account")
+```
+
+Selecting by tag rather than by name means a new credit card is covered the
+moment you tag it, with no rule to edit. Available to a formula:
+
+- `income`, `setaside`, `investable`, `allocated`, `remaining`
+- `balance(sel…)` signed, `owed(sel…)` positive for debts, `line("rule name")`
+- `min`, `max`, `abs`, `round`, `floor`, `ceil`, `clamp`
+- selectors: an account name, `tag:key=value`, `kind:liability`, or `*`
+
+The editor shows what a formula comes to *right now*, so a mistake surfaces while
+you type it rather than the month it silently routes nothing.
+
+#### What executing a plan records
+
+The money is written the way it actually moves:
+
+```
+income        Income  →  the account it is paid into    (enters net worth)
+set-asides    that account  →  wherever they point      (spending, if outside)
+investments   that account  →  the target account       (stays inside; nets to zero)
+```
+
+So the month's contribution is income less what genuinely left, per-account flows
+are right for a per-account return, and none of it had to be classified by hand.
+
+**The target account's side of the net worth boundary decides the meaning.**
+Topping up a spending account you own is a *transfer* — the money is still yours
+until it is spent, so net worth is unchanged. Pointing a set-aside at an expense
+account outside net worth records it as spending. Both are legitimate; the screen
+shows which you chose and what it does to net worth before you commit.
 
 ### The twice-a-year routine
 
@@ -83,7 +177,9 @@ read as the amount owed. Before anything is written, a review screen shows the
 whole round and the split it produces.
 
 That second field is the entire trick. It is optional on every account, but each
-one you fill sharpens the contribution-versus-returns split.
+one you fill sharpens the contribution-versus-returns split. If you have been
+planning monthly, the contributions are already on record and the screen says so,
+so you can leave it blank rather than counting the same money twice.
 
 ## Why a database instead of a spreadsheet
 
@@ -142,6 +238,12 @@ series — is the same query with a different instrument.
 `liquidity`, `goal`, `owner`, `jurisdiction`, anything. This is the escape valve
 that makes a new way of slicing the portfolio a `WHERE` clause instead of a
 schema migration.
+
+**`allocation_rules`, `plans` and `plan_lines`** hold the monthly routing. Rules
+are the reusable template; a plan is one month's application of them to real
+income. A plan's lines are stored rather than recomputed, so a month executed
+under one set of rules is not silently rewritten when the rules change later —
+history has to stay what actually happened.
 
 **`scenarios`** keep what-ifs out of the facts. Scenario 0 is reality and every
 view filters to it, so a projection can never contaminate history.
@@ -235,6 +337,8 @@ internal/money      exact scaled-integer amounts, parsing and formatting
 internal/db         open, migrate, install the view layer, checks, backups
 internal/db/sql     schema migrations, views.sql, queries.sql (embedded)
 internal/store      typed accounts, snapshots, flows, summaries
+internal/plan       the monthly allocation waterfall
+internal/expr       the formula language rules are written in
 internal/analysis   XIRR, Modified Dietz, chained TWR
 internal/report     text, markdown, csv and json output
 internal/tui        the interface

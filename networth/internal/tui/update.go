@@ -35,6 +35,12 @@ type updateScreen struct {
 	addedInput   textinput.Model
 	dateInput    textinput.Model
 
+	// recorded is what monthly plans have already logged as arriving in each
+	// account since it was last valued. Showing it is what stops the same
+	// contribution being entered twice, which would inflate contributions and
+	// understate returns by the same amount.
+	recorded map[int64]money.Amount
+
 	confirmCancel bool
 	fieldErr      string
 }
@@ -94,6 +100,9 @@ func (u *updateScreen) Refresh() error {
 	u.accounts = tracked
 
 	if u.last, err = u.m.store.LastSnapshots(); err != nil {
+		return err
+	}
+	if u.recorded, err = u.m.store.RecordedContributions(); err != nil {
 		return err
 	}
 	if u.idx >= len(u.accounts) {
@@ -475,7 +484,12 @@ func (u *updateScreen) viewEntry(width, height int) string {
 	b.WriteString(u.previewLine(a, last))
 	b.WriteString("\n")
 	b.WriteString(u.fieldRow("of which added", u.addedInput, u.field == 1))
-	b.WriteString("  " + pad("", 16, false) + styFaint.Render(addedHelp(a)) + "\n")
+	if rec := u.recorded[a.ID]; rec != 0 {
+		b.WriteString("  " + pad("", 16, false) + styGain.Render("✓ ") + styMuted.Render(
+			u.m.fmts(rec)+" already recorded by your monthly plans — leave this blank") + "\n")
+	} else {
+		b.WriteString("  " + pad("", 16, false) + styFaint.Render(addedHelp(a)) + "\n")
+	}
 
 	if u.fieldErr != "" {
 		b.WriteString("\n  " + styError.Render(u.fieldErr) + "\n")
