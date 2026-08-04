@@ -118,18 +118,26 @@ func (p *planScreen) income() (money.Amount, error) {
 	return money.Parse(text)
 }
 
-// Capturing reports whether keystrokes belong to a text field. It is false once
-// the income field is blurred, so that the number keys advertised in the tab bar
+// Focus reports how much of the keyboard this screen owns. It drops back to
+// idle once the income field is blurred, so the digits advertised in the tab bar
 // always have a way of working: esc leaves input mode, and navigation resumes.
 // A screen that traps the cursor is a screen the user cannot get out of.
-func (p *planScreen) Capturing() bool {
+func (p *planScreen) Focus() focusLevel {
 	switch p.mode {
 	case planRules:
-		return p.editor != nil
+		if p.editor != nil {
+			return focusTyping
+		}
+		// The rules list is not text, but a, e, d and space all mean something
+		// here, so the bare global keys have to stand down.
+		return focusBusy
 	case planEditAmount, planEditDate:
-		return true
+		return focusTyping
 	default:
-		return p.incomeIn.Focused()
+		if p.incomeIn.Focused() {
+			return focusTyping
+		}
+		return focusIdle
 	}
 }
 

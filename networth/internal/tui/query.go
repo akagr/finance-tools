@@ -50,7 +50,12 @@ func (q *queryScreen) Refresh() error {
 	return nil
 }
 
-func (q *queryScreen) Capturing() bool { return q.editing }
+func (q *queryScreen) Focus() focusLevel {
+	if q.editing {
+		return focusTyping
+	}
+	return focusIdle
+}
 
 func (q *queryScreen) Hints() []hint {
 	if q.editing {

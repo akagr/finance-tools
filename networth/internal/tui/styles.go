@@ -36,6 +36,9 @@ var (
 	styTab       = lipgloss.NewStyle().Padding(0, 2).Foreground(colMuted)
 	styTabActive = lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(colAccent).
 			Underline(true)
+	// styTabMuted marks the tabs you cannot jump to right now, because the
+	// screen has the keyboard. Dimming is the cheapest honest way to say so.
+	styTabMuted = lipgloss.NewStyle().Padding(0, 2).Foreground(colFaint)
 
 	styTableHead = lipgloss.NewStyle().Bold(true).Foreground(colMuted)
 	stySelected  = lipgloss.NewStyle().Bold(true).Foreground(colAccent)

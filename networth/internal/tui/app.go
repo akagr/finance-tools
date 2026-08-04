@@ -42,6 +42,28 @@ const (
 
 var viewNames = []string{"Dashboard", "Plan", "Update", "Accounts", "History", "Query"}
 
+// focusLevel says how much of the keyboard the current screen owns.
+//
+// A key that sometimes navigates and sometimes edits is worse than one that
+// never navigates, so this is stated once here rather than decided key by key.
+// The rule that follows from it: a global binding may only fire at a level where
+// it cannot possibly mean something to the screen.
+type focusLevel int
+
+const (
+	// focusIdle: the screen wants nothing in particular. Every global binding
+	// works, including the bare ones - tab, the digits, q, r, ?.
+	focusIdle focusLevel = iota
+	// focusBusy: something is open - a list, a wizard step, a confirmation - so
+	// letters and digits may mean something here. Only chorded keys stay global,
+	// which is also what stops q from throwing away an unsaved round.
+	focusBusy
+	// focusTyping: a text field has the keyboard. As focusBusy, and in addition
+	// tab belongs to the form, because tab means "next field" everywhere else in
+	// computing and this application is not going to be the exception.
+	focusTyping
+)
+
 // screen is one tab of the interface.
 type screen interface {
 	// Update handles a message and may return a command.
@@ -50,9 +72,9 @@ type screen interface {
 	View(width, height int) string
 	// Hints are the keys currently available, shown in the footer.
 	Hints() []hint
-	// Capturing reports whether the screen is taking raw text input, in which
-	// case global single-letter shortcuts must not steal keystrokes.
-	Capturing() bool
+	// Focus reports how much of the keyboard the screen currently owns, so that
+	// global bindings never fire while they could be meant for the screen.
+	Focus() focusLevel
 	// Refresh reloads from the database after something changed.
 	Refresh() error
 }
@@ -177,11 +199,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// handleKey deals with the global bindings, and is careful never to swallow a
-// keystroke meant for a text field.
+// handleKey deals with the global bindings.
+//
+// Every binding here is gated on the current focus level, so that a key never
+// does one thing on one screen and something else on another. In particular
+// tab and shift+tab are a pair: either both move between screens or neither
+// does. Splitting them - which is what happens if only the bare keys are
+// checked against a "capturing" flag - produces a form where tab moves to the
+// next field and shift+tab leaves the screen entirely.
 func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
-	capturing := m.screens[m.active].Capturing()
-
 	// ctrl+c always quits, even mid-edit, because an escape hatch that depends
 	// on application state is not an escape hatch.
 	if key.Type == tea.KeyCtrlC {
@@ -202,16 +228,30 @@ func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
 	// so a message is never missed and never lingers.
 	m.status, m.err = "", nil
 
-	if capturing {
-		// While typing, only unambiguous non-text keys are global.
-		switch key.String() {
-		case "ctrl+left", "shift+tab":
-			m.prevView()
-			return nil, true
-		case "ctrl+right":
-			m.nextView()
-			return nil, true
-		}
+	// Chorded screen switching works at every focus level, so there is always a
+	// way out of a form that no screen can shadow. The footer advertises it
+	// whenever the bare keys are unavailable.
+	switch key.String() {
+	case "ctrl+right", "ctrl+n":
+		m.nextView()
+		return nil, true
+	case "ctrl+left", "ctrl+p":
+		m.prevView()
+		return nil, true
+	}
+
+	focus := m.screens[m.active].Focus()
+
+	// Help is safe to open whenever '?' cannot be text.
+	if focus != focusTyping && key.String() == "?" {
+		m.showHelp = true
+		return nil, true
+	}
+
+	// Anything else belongs to the screen while it is doing something. esc is
+	// never global: it always means "back out one step", which is the screen's
+	// business, and a global esc would make it mean two things at once.
+	if focus != focusIdle {
 		return nil, false
 	}
 
@@ -219,13 +259,10 @@ func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
 	case "q":
 		m.quitting = true
 		return tea.Quit, true
-	case "?":
-		m.showHelp = true
-		return nil, true
-	case "tab", "ctrl+right":
+	case "tab":
 		m.nextView()
 		return nil, true
-	case "shift+tab", "ctrl+left":
+	case "shift+tab":
 		m.prevView()
 		return nil, true
 	case "1", "2", "3", "4", "5", "6":
@@ -266,8 +303,19 @@ func (m *Model) View() string {
 	}
 
 	header := m.header()
-	hints := append(m.screens[m.active].Hints(), hint{"?", "help"}, hint{"q", "quit"})
-	foot := footer(m.width, hints)
+	// The way out is always on screen, in its own column on the right so that a
+	// crowded screen truncates its own hints before it truncates the escape.
+	// Which keys those are depends on how much of the keyboard the screen owns.
+	var globals []hint
+	switch m.screens[m.active].Focus() {
+	case focusIdle:
+		globals = []hint{{"⇥", "screen"}, {"?", "help"}, {"q", "quit"}}
+	case focusBusy:
+		globals = []hint{{"ctrl+←→", "screen"}, {"?", "help"}, {"ctrl+c", "quit"}}
+	default:
+		globals = []hint{{"ctrl+←→", "screen"}, {"ctrl+c", "quit"}}
+	}
+	foot := footer(m.width, m.screens[m.active].Hints(), globals)
 
 	statusLine := ""
 	switch {
@@ -299,13 +347,22 @@ func (m *Model) View() string {
 // header shows where you are and, on the right, which file you are looking at -
 // which matters when the whole point is that the database can be swapped.
 func (m *Model) header() string {
+	// The digits are only shown while they work. A label that keeps advertising
+	// "3 Update" when the screen has the keyboard teaches the wrong lesson the
+	// first time it is pressed and ignored.
+	live := m.screens[m.active].Focus() == focusIdle
 	var tabs []string
 	for i, name := range viewNames {
-		label := fmt.Sprintf("%d %s", i+1, name)
+		label := name
+		if live {
+			label = fmt.Sprintf("%d %s", i+1, name)
+		}
 		if view(i) == m.active {
 			tabs = append(tabs, styTabActive.Render(label))
-		} else {
+		} else if live {
 			tabs = append(tabs, styTab.Render(label))
+		} else {
+			tabs = append(tabs, styTabMuted.Render(label))
 		}
 	}
 	left := strings.Join(tabs, "")
@@ -331,11 +388,15 @@ func (m *Model) helpView() string {
 		items []hint
 	}{
 		{"Anywhere", []hint{
-			{"1 – 5", "jump straight to a screen"},
+			{"ctrl+← ctrl+→", "previous or next screen — always works"},
+			{"ctrl+c", "quit — always works"},
+			{"?", "this help"},
+		}},
+		{"When nothing is open", []hint{
+			{"1 – 6", "jump straight to a screen"},
 			{"tab / shift+tab", "next or previous screen"},
 			{"r", "reload from the database"},
-			{"?", "this help"},
-			{"q / ctrl+c", "quit"},
+			{"q", "quit"},
 		}},
 		{"Dashboard", []hint{
 			{"↑ ↓", "move through accounts"},
@@ -352,11 +413,19 @@ func (m *Model) helpView() string {
 		}},
 		{"Update", []hint{
 			{"enter", "confirm the field and move on"},
-			{"tab", "switch between balance and amount added"},
+			{"tab / shift+tab", "switch between balance and amount added"},
 			{"↑ ↓", "previous or next account"},
 			{"s", "skip this account, leaving it unchanged"},
 			{"ctrl+s", "go to the review screen"},
-			{"esc", "abandon the round"},
+			{"esc", "leave the round (twice, if anything is entered)"},
+		}},
+		{"Forms (accounts, rules)", []hint{
+			{"tab / shift+tab", "next or previous field"},
+			{"↑ ↓", "next or previous field"},
+			{"← → / space", "choose, on a field with fixed options"},
+			{"type then ↓", "complete, on a field that refers to something"},
+			{"ctrl+s", "save"},
+			{"esc", "close the list, or cancel the form"},
 		}},
 		{"Accounts", []hint{
 			{"a", "add an account"},
@@ -379,6 +448,15 @@ func (m *Model) helpView() string {
 		}
 		b.WriteString("\n")
 	}
+
+	b.WriteString(styHeading.Render("How the keyboard works") + "\n")
+	b.WriteString(styMuted.Render(wrap(
+		"One rule: while something is open - a form, a list, a field - the screen owns the "+
+			"keyboard, and the plain keys mean what the footer says they mean. Tab moves "+
+			"between fields, not between screens, and esc backs out one step. The tab bar dims "+
+			"and its numbers disappear while this is the case, so you can see it rather than "+
+			"discover it. ctrl+← and ctrl+→ change screen at any time, from anywhere.",
+		min(m.width-2, 76))) + "\n\n")
 
 	b.WriteString(styHeading.Render("Two rhythms") + "\n")
 	b.WriteString(styMuted.Render(wrap(

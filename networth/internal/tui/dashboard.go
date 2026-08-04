@@ -86,7 +86,7 @@ func (d *dashboard) snapBack(days int) string {
 	return best
 }
 
-func (d *dashboard) Capturing() bool { return false }
+func (d *dashboard) Focus() focusLevel { return focusIdle }
 
 func (d *dashboard) Hints() []hint {
 	return []hint{
@@ -156,8 +156,8 @@ func (d *dashboard) emptyState(width int) string {
 	var b strings.Builder
 	b.WriteString("\n  " + styTitle.Render("Nothing recorded yet.") + "\n\n")
 	b.WriteString(styMuted.Render(wrapIndent(
-		"Add the accounts you want to track on the Accounts screen (press 3, then a), "+
-			"then press 2 to enter their balances. Two rounds of balances, a few months apart, "+
+		"Add the accounts you want to track on the Accounts screen (press 4, then a), "+
+			"then press 3 to enter their balances. Two rounds of balances, a few months apart, "+
 			"is enough to start separating what you contributed from what you earned.",
 		min(width-4, 76), "  ")) + "\n")
 	return b.String()

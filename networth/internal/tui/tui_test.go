@@ -10,6 +10,7 @@ import (
 	"github.com/akagr/finance-tools/networth/internal/plan"
 	"github.com/akagr/finance-tools/networth/internal/store"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // newModel builds the interface over a database seeded with two rounds of
@@ -66,6 +67,12 @@ func press(t *testing.T, m *Model, keys ...string) {
 			msg = tea.KeyMsg{Type: tea.KeyEnter}
 		case "tab":
 			msg = tea.KeyMsg{Type: tea.KeyTab}
+		case "shift+tab":
+			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
+		case "ctrl+left":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlLeft}
+		case "ctrl+right":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlRight}
 		case "esc":
 			msg = tea.KeyMsg{Type: tea.KeyEsc}
 		case "up":
@@ -119,8 +126,10 @@ func TestFooterAlwaysShowsAvailableKeys(t *testing.T) {
 	for i, name := range viewNames {
 		m.active = view(i)
 		out := m.View()
-		if !strings.Contains(out, "help") || !strings.Contains(out, "quit") {
-			t.Errorf("%s: footer is missing the global keys", name)
+		// Whatever else a screen shows, it must always say how to change
+		// screens and how to get out.
+		if !strings.Contains(out, "screen") || !strings.Contains(out, "quit") {
+			t.Errorf("%s: footer is missing the way out", name)
 		}
 		if strings.TrimSpace(out) == "" {
 			t.Errorf("%s: rendered nothing", name)
@@ -732,13 +741,13 @@ func TestEscapeLeavesInputModeOnThePlanScreen(t *testing.T) {
 	press(t, m, "2")
 
 	p := m.screens[viewPlan].(*planScreen)
-	if !p.Capturing() {
+	if p.Focus() != focusTyping {
 		t.Fatal("the income field should have focus on arrival")
 	}
 	typeText(t, m, "300000")
 
 	press(t, m, "esc")
-	if p.Capturing() {
+	if p.Focus() != focusIdle {
 		t.Fatal("esc should have left input mode")
 	}
 	if !strings.Contains(m.View(), "i") {
@@ -750,7 +759,7 @@ func TestEscapeLeavesInputModeOnThePlanScreen(t *testing.T) {
 	}
 
 	press(t, m, "2", "i")
-	if !p.Capturing() {
+	if p.Focus() != focusTyping {
 		t.Error("i should put the cursor back in the income field")
 	}
 }
@@ -877,7 +886,8 @@ func TestChoiceFieldCyclesAndShowsEveryOption(t *testing.T) {
 func TestTextFieldPassesNavigationKeysThrough(t *testing.T) {
 	f := newTextField("Name", "")
 	f.Focus()
-	for _, k := range []tea.KeyType{tea.KeyTab, tea.KeyDown, tea.KeyUp, tea.KeyEnter, tea.KeyEsc} {
+	for _, k := range []tea.KeyType{tea.KeyTab, tea.KeyShiftTab, tea.KeyDown,
+		tea.KeyUp, tea.KeyEnter, tea.KeyEsc} {
 		if handled, _ := f.Update(tea.KeyMsg{Type: k}); handled {
 			t.Errorf("%v should pass through to the form", k)
 		}
@@ -1107,5 +1117,204 @@ func TestBookkeepingAccountsAreNotAskedFor(t *testing.T) {
 		case store.ExternalAccount, store.IncomeAccount, store.SpendAccount:
 			t.Errorf("%s is bookkeeping and should not be asked for", a.Name)
 		}
+	}
+}
+
+// Navigation keys must come in pairs. tab and shift+tab that disagree about
+// whether they belong to the form or to the tab bar is the single most
+// disorienting thing an interface like this can do.
+func TestShiftTabMovesBetweenFieldsNotScreens(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "4", "a")
+	s := m.screens[viewAccounts].(*accountsScreen)
+	if s.form == nil {
+		t.Fatal("a did not open the account form")
+	}
+
+	press(t, m, "tab", "tab")
+	if s.form.field != 2 {
+		t.Fatalf("after two tabs the form is on field %d, want 2", s.form.field)
+	}
+	press(t, m, "shift+tab")
+	if m.active != viewAccounts {
+		t.Fatalf("shift+tab left the screen, landing on %s", viewNames[m.active])
+	}
+	if s.form.field != 1 {
+		t.Errorf("shift+tab put the form on field %d, want 1 - it must mirror tab",
+			s.form.field)
+	}
+}
+
+// Every screen that owns the keyboard must still be leaveable, and the way out
+// must be on screen rather than remembered.
+func TestChordedNavigationAlwaysWorksAndIsAdvertised(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "4", "a")
+	if m.screens[viewAccounts].Focus() != focusTyping {
+		t.Fatal("an open form should own the keyboard")
+	}
+	if out := m.View(); !strings.Contains(out, "ctrl+←→") {
+		t.Errorf("the footer must show the way out while a form is open:\n%s", out)
+	}
+	press(t, m, "ctrl+right")
+	if m.active != viewHistory {
+		t.Errorf("ctrl+right went to %s, want History", viewNames[m.active])
+	}
+	press(t, m, "ctrl+left")
+	if m.active != viewAccounts {
+		t.Errorf("ctrl+left went to %s, want Accounts", viewNames[m.active])
+	}
+}
+
+// A bare letter must never reach the application while a screen is doing
+// something. q on the review step would quit and throw the whole round away.
+func TestBareGlobalKeysStandDownWhileAScreenIsBusy(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "3")
+	typeText(t, m, "500000")
+	press(t, m, "ctrl+s")
+
+	u := m.screens[viewUpdate].(*updateScreen)
+	if u.phase != phaseReview {
+		t.Fatalf("ctrl+s did not reach the review step (phase %v)", u.phase)
+	}
+	if u.Focus() == focusIdle {
+		t.Fatal("an unsaved round must not leave the keyboard to the tab bar")
+	}
+	press(t, m, "q")
+	if m.quitting {
+		t.Error("q quit the application and discarded an unsaved round")
+	}
+	press(t, m, "1")
+	if m.active != viewUpdate {
+		t.Errorf("a digit navigated away from an unsaved round, to %s",
+			viewNames[m.active])
+	}
+	press(t, m, "tab")
+	if m.active != viewUpdate {
+		t.Errorf("tab navigated away from an unsaved round, to %s",
+			viewNames[m.active])
+	}
+}
+
+// esc means "back out one step", never "jump somewhere else". On the review
+// step it returns to the entry it came from, and entered figures survive.
+func TestEscapeBacksOutOneStepAtATime(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "3")
+	typeText(t, m, "500000")
+	press(t, m, "ctrl+s")
+
+	u := m.screens[viewUpdate].(*updateScreen)
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatalf("esc from the review step left the screen, to %s", viewNames[m.active])
+	}
+	if u.phase != phaseEntry {
+		t.Errorf("esc from the review step should return to entry, phase is %v", u.phase)
+	}
+	if !u.dirty() {
+		t.Error("backing out of the review discarded what was entered")
+	}
+
+	// Only now, with the round still dirty, does esc offer to leave - and it
+	// says so before it does it.
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatalf("the first esc discarded a dirty round without asking, to %s",
+			viewNames[m.active])
+	}
+	if !strings.Contains(m.View(), "esc again") {
+		t.Errorf("the screen must say what a second esc will do:\n%s", m.View())
+	}
+	press(t, m, "esc")
+	if m.active != viewDashboard {
+		t.Errorf("a confirmed esc should leave the round, went to %s",
+			viewNames[m.active])
+	}
+}
+
+// The tab bar advertises digits. It must stop advertising them while they do
+// nothing, or the interface teaches a key that fails the first time it is used.
+func TestTabBarStopsAdvertisingDigitsWhileAScreenIsBusy(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "4")
+	if out := m.header(); !strings.Contains(out, "4 Accounts") {
+		t.Errorf("an idle screen should show the digits:\n%s", out)
+	}
+	press(t, m, "a")
+	if out := m.header(); strings.Contains(out, "4 Accounts") {
+		t.Errorf("the digits should not be shown while a form is open:\n%s", out)
+	}
+}
+
+// A completing field must give shift+tab back to the form. It has no use for it
+// - there is nothing to go back to inside a single field - and swallowing it is
+// how a form ends up only navigable in one direction.
+func TestSuggestFieldPassesShiftTabThrough(t *testing.T) {
+	f := newSuggestField("Currency", "", []string{"INR", "USD"}, true)
+	f.Focus()
+	if handled, _ := f.Update(tea.KeyMsg{Type: tea.KeyShiftTab}); handled {
+		t.Error("shift+tab should pass through to the form")
+	}
+	f.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("I")})
+	if !f.open {
+		t.Fatal("typing should open the suggestion list")
+	}
+	if handled, _ := f.Update(tea.KeyMsg{Type: tea.KeyShiftTab}); handled {
+		t.Error("shift+tab should pass through even with the list open")
+	}
+}
+
+// The promise that the way out is always on screen has to hold at any width, so
+// a crowded footer drops its own hints rather than the escape.
+func TestFooterKeepsTheWayOutWhenSpaceRunsOut(t *testing.T) {
+	globals := []hint{{"ctrl+←→", "screen"}, {"ctrl+c", "quit"}}
+	many := []hint{
+		{"↵", "next"}, {"⇥", "balance / added"}, {"↑↓", "account"},
+		{"ctrl+s", "review & save"}, {"ctrl+d", "date"}, {"esc", "discard this round"},
+	}
+	for _, width := range []int{60, 80, 100, 120} {
+		out := footer(width, many, globals)
+		if !strings.Contains(out, "quit") || !strings.Contains(out, "screen") {
+			t.Errorf("width %d dropped the way out: %q", width, out)
+		}
+		if strings.Contains(out, "\n") {
+			t.Errorf("width %d wrapped onto a second line: %q", width, out)
+		}
+		// Below about eighty columns even the minimum does not fit, and
+		// overflowing is better than hiding the way out.
+		if w := lipgloss.Width(out); w > width && width >= 80 {
+			t.Errorf("width %d rendered %d columns: %q", width, w, out)
+		}
+	}
+}
+
+// A figure that has been typed but not yet confirmed is still work. esc must
+// offer to discard it rather than leaving as though nothing was entered - the
+// screen appearing to change on its own is exactly how that looks from the
+// other side of the keyboard.
+func TestEscapeAsksBeforeDiscardingAnUnconfirmedFigure(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "3")
+	typeText(t, m, "450000")
+
+	u := m.screens[viewUpdate].(*updateScreen)
+	if u.dirty() {
+		t.Fatal("the test assumes the figure has not been committed yet")
+	}
+	if !strings.Contains(m.View(), "discard this round") {
+		t.Errorf("the footer should already warn that esc discards:\n%s", m.View())
+	}
+
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatalf("esc discarded a typed figure without asking, landing on %s",
+			viewNames[m.active])
+	}
+	press(t, m, "esc")
+	if m.active != viewDashboard {
+		t.Errorf("a confirmed esc should leave the round, went to %s",
+			viewNames[m.active])
 	}
 }

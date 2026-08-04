@@ -70,8 +70,11 @@ func (s *accountsScreen) visible() []store.Account {
 	return out
 }
 
-func (s *accountsScreen) Capturing() bool {
-	return s.filtering || s.form != nil
+func (s *accountsScreen) Focus() focusLevel {
+	if s.filtering || s.form != nil {
+		return focusTyping
+	}
+	return focusIdle
 }
 
 func (s *accountsScreen) Hints() []hint {

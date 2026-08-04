@@ -93,6 +93,22 @@ Press `2`, type what came in, and the routing appears as you type:
 just for this month — which is how "no PPF this month" works without touching the
 rule.
 
+#### Getting around
+
+One rule: **while something is open — a form, a list, a field — the screen owns
+the keyboard**, and the plain keys mean what the footer says they mean. `tab` and
+`shift+tab` move between fields, not between screens, and `esc` backs out one
+step. The tab bar dims and its numbers disappear while that is the case, so it is
+visible rather than something to discover by pressing a key and having it
+ignored.
+
+`ctrl+←` and `ctrl+→` change screen from anywhere, including mid-form, and
+`ctrl+c` always quits. When nothing is open, `1`–`6` jump straight to a screen,
+`tab`/`shift+tab` cycle, `r` reloads and `q` quits.
+
+Nothing that discards work happens on one keystroke: `esc` on a half-finished
+balance round asks first.
+
 #### Filling in forms
 
 Fields only accept what is actually valid. A fixed set of values is a choice you
