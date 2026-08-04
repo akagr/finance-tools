@@ -192,3 +192,27 @@ func TestAnnualiseLeavesShortSpansAlone(t *testing.T) {
 	}
 	closeTo(t, got, 0.10, 0.005, "annualised")
 }
+
+// Cashflows that all land on one date describe a moment, not a period. There is
+// no rate that fits them better than any other, so a solver that returns a
+// number is inventing one. This is exactly the shape of a first round of
+// balances, so it is a normal input, not an exotic edge case.
+func TestXIRRRejectsSameDayCashflows(t *testing.T) {
+	if r, err := XIRR([]Cashflow{
+		{date("2026-08-04"), money.FromMajor(-650000)},
+		{date("2026-08-04"), money.FromMajor(650000)},
+	}); err == nil {
+		t.Errorf("XIRR = %.4f, want an error: a single date cannot imply a return", r)
+	}
+}
+
+func TestXIRRRejectsFlowsThatCancelAtEveryRate(t *testing.T) {
+	if r, err := XIRR([]Cashflow{
+		{date("2024-01-01"), money.FromMajor(-100)},
+		{date("2024-01-01"), money.FromMajor(100)},
+		{date("2025-01-01"), money.FromMajor(-50)},
+		{date("2025-01-01"), money.FromMajor(50)},
+	}); err == nil {
+		t.Errorf("XIRR = %.4f, want an error: every rate solves this", r)
+	}
+}
