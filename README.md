@@ -17,6 +17,7 @@ tied together by a root `go.work` workspace.
 | **correlation** | [`correlation/`](correlation/) | in progress      | Computes return **correlations** across assets (e.g. VWRA vs Nifty 50) to assess how diversified a portfolio really is.           |
 | **backtest**    | [`backtest/`](backtest/)       | complete         | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs), with walk-forward, parameter sweeps, Monte-Carlo and regime robustness tests. Research only — not advice. |
 | **papertrade**  | [`papertrade/`](papertrade/)   | complete         | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account, equity curve, performance vs benchmark) to validate it before risking capital. No real orders — not advice. |
+| **networth**    | [`networth/`](networth/)       | in progress      | Tracks **net worth** over time in a single SQLite file and separates **contributions from returns**, so XIRR is not flattered by how much you saved. Terminal interface (Bubble Tea), arbitrary SQL for anything the screens do not show. Not advice. |
 
 ## Layout
 
@@ -24,6 +25,7 @@ tied together by a root `go.work` workspace.
 finance-tools/
   go.work            # ties all tool modules together
   itr-foreign/       # each tool: its own go.mod, cmd/, internal/, docs/, data/
+  networth/          # the one module with external deps (SQLite, Bubble Tea)
   …                  # future tools as sibling directories
 ```
 

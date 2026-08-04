@@ -42,6 +42,20 @@ backtest/backtest
 papertrade/papertrade
 papertrade/accounts/
 
+# networth: built binary and the database itself.
+# The .db file IS the source of truth and holds a complete net worth, every
+# account and every balance — strictly more sensitive than a broker export.
+# Backups and WAL/shm sidecars are ignored too.
+# NOTE: gitignore does NOT support inline comments — keep comments on their own line.
+networth/networth
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+networth/backups/
+!networth/internal/*/testdata/**/*.db
+
 # Python bytecode
 __pycache__/
 *.pyc
