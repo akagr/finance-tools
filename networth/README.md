@@ -95,19 +95,22 @@ rule.
 
 #### Getting around
 
-One rule: **while something is open — a form, a list, a field — the screen owns
-the keyboard**, and the plain keys mean what the footer says they mean. `tab` and
-`shift+tab` move between fields, not between screens, and `esc` backs out one
-step. The tab bar dims and its numbers disappear while that is the case, so it is
-visible rather than something to discover by pressing a key and having it
-ignored.
+`ctrl+←` and `ctrl+→` change screen from anywhere, mid-field included, and
+`ctrl+c` always quits. Those two never change meaning.
 
-`ctrl+←` and `ctrl+→` change screen from anywhere, including mid-form, and
-`ctrl+c` always quits. When nothing is open, `1`–`6` jump straight to a screen,
-`tab`/`shift+tab` cycle, `r` reloads and `q` quits.
+While something is open — a form, a list, a wizard step — the plain **letters**
+belong to the screen. The **numbers and `tab` still change screen**, because
+leaving is never destructive: every screen keeps its state, so you come back to
+exactly what you left.
 
-Nothing that discards work happens on one keystroke: `esc` on a half-finished
-balance round asks first.
+Only an actual **text field** takes the numbers and `tab` too, since there they
+are characters like any other. The tab bar dims and drops its numbers while that
+is the case, so you can see it rather than discover it by pressing a key and
+having nothing happen. `esc` steps back out of the field — it never leaves a
+screen in the same press that it stops typing.
+
+Nothing that discards work happens on one keystroke. Abandoning a half-finished
+balance round takes three: out of the field, a warning, then away.
 
 #### Filling in forms
 
