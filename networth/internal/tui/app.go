@@ -46,21 +46,35 @@ var viewNames = []string{"Dashboard", "Plan", "Update", "Accounts", "History", "
 //
 // A key that sometimes navigates and sometimes edits is worse than one that
 // never navigates, so this is stated once here rather than decided key by key.
-// The rule that follows from it: a global binding may only fire at a level where
-// it cannot possibly mean something to the screen.
+// Two rules follow from it, and they pull in opposite directions:
+//
+//   - A global binding may only fire where it cannot possibly mean something to
+//     the screen. Otherwise q quits in the middle of a half-finished round.
+//   - Getting off a screen must never be harder than getting onto it. A screen
+//     that has to be escaped before it can be left is a trap, and the fact that
+//     the escape is on screen does not make it less of one.
+//
+// So the levels are graded by what could be text, not by how busy the screen
+// looks: letters stand down first, because a screen full of single-letter
+// actions is common; tab and the digits stand down only for an actual text
+// field, where they genuinely are input.
 type focusLevel int
 
 const (
 	// focusIdle: the screen wants nothing in particular. Every global binding
-	// works, including the bare ones - tab, the digits, q, r, ?.
+	// works, including the bare letters - q, r, ?.
 	focusIdle focusLevel = iota
-	// focusBusy: something is open - a list, a wizard step, a confirmation - so
-	// letters and digits may mean something here. Only chorded keys stay global,
-	// which is also what stops q from throwing away an unsaved round.
+	// focusBusy: something is open - a list, a wizard step - so letters may mean
+	// something here and stand down. Navigation does not: tab and the digits
+	// still change screen, because leaving is always safe. Every screen keeps
+	// its state when it loses focus, so coming back resumes exactly where you
+	// were; only quitting outright would lose anything, and that is precisely
+	// the binding this level withholds.
 	focusBusy
-	// focusTyping: a text field has the keyboard. As focusBusy, and in addition
-	// tab belongs to the form, because tab means "next field" everywhere else in
-	// computing and this application is not going to be the exception.
+	// focusTyping: a text field has the keyboard, so tab and the digits are
+	// input like any other character and only chords stay global. Every state
+	// that reports this must offer esc as a way back to a lower level, or the
+	// screen becomes a trap.
 	focusTyping
 )
 
@@ -90,10 +104,11 @@ type Model struct {
 	active        view
 	screens       []screen
 
-	showHelp bool
-	status   string
-	err      error
-	quitting bool
+	showHelp   bool
+	helpScroll int
+	status     string
+	err        error
+	quitting   bool
 }
 
 // statusMsg reports the outcome of an action in the header, briefly.
@@ -182,7 +197,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case switchViewMsg:
 		m.active = view(msg)
-		m.showHelp = false
+		m.showHelp, m.helpScroll = false, 0
 		if err := m.screens[m.active].Refresh(); err != nil {
 			m.err = err
 		}
@@ -217,9 +232,19 @@ func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
 
 	if m.showHelp {
 		switch key.String() {
-		case "?", "esc", "q", "enter":
-			m.showHelp = false
-			return nil, true
+		case "up", "k":
+			m.helpScroll--
+		case "down", "j":
+			m.helpScroll++
+		case "pgup":
+			m.helpScroll -= max(1, m.height-4)
+		case "pgdown", " ":
+			m.helpScroll += max(1, m.height-4)
+		default:
+			m.showHelp, m.helpScroll = false, 0
+		}
+		if m.helpScroll < 0 {
+			m.helpScroll = 0
 		}
 		return nil, true
 	}
@@ -242,10 +267,31 @@ func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
 
 	focus := m.screens[m.active].Focus()
 
-	// Help is safe to open whenever '?' cannot be text.
-	if focus != focusTyping && key.String() == "?" {
-		m.showHelp = true
-		return nil, true
+	// Navigation is not text unless a field is actually taking text, so it keeps
+	// working while a screen is merely busy. This is what stops a screen from
+	// becoming a trap, and it costs nothing: leaving preserves the screen's
+	// state, so coming back resumes where you were.
+	if focus != focusTyping {
+		switch key.String() {
+		case "tab":
+			m.nextView()
+			return nil, true
+		case "shift+tab":
+			m.prevView()
+			return nil, true
+		case "1", "2", "3", "4", "5", "6":
+			n := int(key.String()[0] - '1')
+			if n < len(m.screens) {
+				m.active = view(n)
+				if err := m.screens[m.active].Refresh(); err != nil {
+					m.err = err
+				}
+				return nil, true
+			}
+		case "?":
+			m.showHelp = true
+			return nil, true
+		}
 	}
 
 	// Anything else belongs to the screen while it is doing something. esc is
@@ -259,21 +305,6 @@ func (m *Model) handleKey(key tea.KeyMsg) (tea.Cmd, bool) {
 	case "q":
 		m.quitting = true
 		return tea.Quit, true
-	case "tab":
-		m.nextView()
-		return nil, true
-	case "shift+tab":
-		m.prevView()
-		return nil, true
-	case "1", "2", "3", "4", "5", "6":
-		n := int(key.String()[0] - '1')
-		if n < len(m.screens) {
-			m.active = view(n)
-			if err := m.screens[m.active].Refresh(); err != nil {
-				m.err = err
-			}
-			return nil, true
-		}
 	case "r":
 		return func() tea.Msg { return refreshMsg{} }, true
 	}
@@ -311,7 +342,7 @@ func (m *Model) View() string {
 	case focusIdle:
 		globals = []hint{{"⇥", "screen"}, {"?", "help"}, {"q", "quit"}}
 	case focusBusy:
-		globals = []hint{{"ctrl+←→", "screen"}, {"?", "help"}, {"ctrl+c", "quit"}}
+		globals = []hint{{"⇥", "screen"}, {"?", "help"}, {"ctrl+c", "quit"}}
 	default:
 		globals = []hint{{"ctrl+←→", "screen"}, {"ctrl+c", "quit"}}
 	}
@@ -347,10 +378,11 @@ func (m *Model) View() string {
 // header shows where you are and, on the right, which file you are looking at -
 // which matters when the whole point is that the database can be swapped.
 func (m *Model) header() string {
-	// The digits are only shown while they work. A label that keeps advertising
-	// "3 Update" when the screen has the keyboard teaches the wrong lesson the
-	// first time it is pressed and ignored.
-	live := m.screens[m.active].Focus() == focusIdle
+	// The digits are only shown while they work, which is everywhere except in
+	// a text field, where they are input. A label that keeps advertising
+	// "3 Update" when the digit will be typed into a field teaches the wrong
+	// lesson the first time it is pressed.
+	live := m.screens[m.active].Focus() != focusTyping
 	var tabs []string
 	for i, name := range viewNames {
 		label := name
@@ -379,7 +411,32 @@ func shortPath(p string) string {
 	return "…" + p[len(p)-45:]
 }
 
+// helpView is the only screen allowed to be longer than the terminal, so it is
+// the only one that scrolls. A help page whose top has scrolled off is worse
+// than no help at all: it is read by someone who is already stuck.
 func (m *Model) helpView() string {
+	body := strings.Split(m.helpBody(), "\n")
+	avail := max(3, m.height-1)
+	if len(body) <= avail {
+		m.helpScroll = 0
+		return strings.Join(body, "\n")
+	}
+	m.helpScroll = clampInt(m.helpScroll, 0, len(body)-avail)
+	window := body[m.helpScroll : m.helpScroll+avail]
+
+	more := ""
+	if m.helpScroll+avail < len(body) {
+		more = "  ·  more below"
+	}
+	return strings.Join(window, "\n") + "\n" +
+		styFaint.Render("↑↓ pgup pgdn scroll"+more+"  ·  any other key to go back")
+}
+
+func clampInt(v, lo, hi int) int {
+	return max(lo, min(hi, v))
+}
+
+func (m *Model) helpBody() string {
 	var b strings.Builder
 	b.WriteString(styTitle.Render("networth — keys") + "\n\n")
 
@@ -387,43 +444,45 @@ func (m *Model) helpView() string {
 		name  string
 		items []hint
 	}{
-		{"Anywhere", []hint{
-			{"ctrl+← ctrl+→", "previous or next screen — always works"},
-			{"ctrl+c", "quit — always works"},
-			{"?", "this help"},
+		{"Anywhere at all", []hint{
+			{"ctrl+← ctrl+→", "previous or next screen"},
+			{"ctrl+c", "quit"},
 		}},
-		{"When nothing is open", []hint{
+		{"Unless a field is taking text", []hint{
 			{"1 – 6", "jump straight to a screen"},
 			{"tab / shift+tab", "next or previous screen"},
+			{"?", "this help"},
+		}},
+		{"When nothing at all is open", []hint{
 			{"r", "reload from the database"},
 			{"q", "quit"},
 		}},
 		{"Dashboard", []hint{
 			{"↑ ↓", "move through accounts"},
 			{"u", "start a balance update"},
-			{"p", "change the period being compared"},
+			{"p", "change the comparison period"},
 		}},
 		{"Plan (monthly)", []hint{
 			{"type an amount", "the routing updates as you type"},
-			{"↑ ↓ then enter", "override one line for this month"},
-			{"ctrl+s", "save and record where the money went"},
+			{"↑ ↓ then enter", "override a line this month"},
+			{"ctrl+s", "save and record the money moved"},
 			{"ctrl+r", "edit the routing rules"},
 			{"ctrl+d", "change the month"},
-			{"ctrl+z", "undo a month you already recorded"},
+			{"ctrl+z", "undo a recorded month"},
 		}},
 		{"Update", []hint{
 			{"enter", "confirm the field and move on"},
-			{"tab / shift+tab", "switch between balance and amount added"},
+			{"tab / shift+tab", "balance or amount added"},
 			{"↑ ↓", "previous or next account"},
-			{"s", "skip this account, leaving it unchanged"},
 			{"ctrl+s", "go to the review screen"},
-			{"esc", "leave the round (twice, if anything is entered)"},
+			{"esc", "step out; again to leave the round"},
+			{"enter", "step back into them"},
 		}},
 		{"Forms (accounts, rules)", []hint{
 			{"tab / shift+tab", "next or previous field"},
 			{"↑ ↓", "next or previous field"},
 			{"← → / space", "choose, on a field with fixed options"},
-			{"type then ↓", "complete, on a field that refers to something"},
+			{"type then ↓", "complete a reference to something"},
 			{"ctrl+s", "save"},
 			{"esc", "close the list, or cancel the form"},
 		}},
@@ -441,44 +500,84 @@ func (m *Model) helpView() string {
 			{"s", "save the query you just edited"},
 		}},
 	}
-	for _, s := range sections {
-		b.WriteString(styHeading.Render(s.name) + "\n")
-		for _, h := range s.items {
-			b.WriteString("  " + pad(styKey.Render(h.key), 26, false) + styKeyDesc.Render(h.desc) + "\n")
+	// Two columns when there is room for them. Nine sections down one column is
+	// two screenfuls, and a key list you have to scroll to read is a key list
+	// that gets skimmed.
+	render := func(sel []struct {
+		name  string
+		items []hint
+	}) string {
+		var c strings.Builder
+		for _, s := range sel {
+			c.WriteString(styHeading.Render(s.name) + "\n")
+			for _, h := range s.items {
+				c.WriteString("  " + pad(styKey.Render(h.key), 17, false) +
+					styKeyDesc.Render(h.desc) + "\n")
+			}
+			c.WriteString("\n")
 		}
-		b.WriteString("\n")
+		return c.String()
+	}
+	twoUp := false
+	if m.width >= 100 {
+		// Split where the two columns come out closest to the same height,
+		// rather than at the middle section: the sections are wildly different
+		// lengths, and an even split leaves one column three times the other.
+		total := 0
+		for _, sec := range sections {
+			total += len(sec.items) + 2
+		}
+		split, running := 1, 0
+		for i, sec := range sections {
+			if running+len(sec.items)+2 > total/2 {
+				split = max(1, i)
+				break
+			}
+			running += len(sec.items) + 2
+		}
+		right := render(sections[split:])
+		// Size the gutter to the content rather than the window, so the two
+		// columns stay close enough to read as a pair.
+		leftCol := lipgloss.Width(render(sections[:split])) + 3
+		if leftCol+lipgloss.Width(right) <= m.width {
+			left := lipgloss.NewStyle().Width(leftCol).Render(render(sections[:split]))
+			b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, left, right))
+			b.WriteString("\n")
+			twoUp = true
+		}
+	}
+	if !twoUp {
+		b.WriteString(render(sections))
 	}
 
 	b.WriteString(styHeading.Render("How the keyboard works") + "\n")
 	b.WriteString(styMuted.Render(wrap(
-		"One rule: while something is open - a form, a list, a field - the screen owns the "+
-			"keyboard, and the plain keys mean what the footer says they mean. Tab moves "+
-			"between fields, not between screens, and esc backs out one step. The tab bar dims "+
-			"and its numbers disappear while this is the case, so you can see it rather than "+
-			"discover it. ctrl+← and ctrl+→ change screen at any time, from anywhere.",
+		"While something is open - a form, a list, a wizard step - the plain letters belong "+
+			"to the screen. The numbers and tab still change screen, because leaving is never "+
+			"destructive: every screen keeps its state. Only a text field takes the numbers and "+
+			"tab too, and the tab bar dims to say so; esc steps back out of it, and never "+
+			"leaves a screen in the same press that it stops typing.",
 		min(m.width-2, 76))) + "\n\n")
 
 	b.WriteString(styHeading.Render("Two rhythms") + "\n")
 	b.WriteString(styMuted.Render(wrap(
-		"Plan monthly, update balances a couple of times a year. The monthly plan is what "+
-			"makes the rest accurate: recording where income went means contributions are a "+
-			"record rather than a recollection, so the split between what you added and what "+
-			"you earned can be trusted.", min(m.width-2, 76))) + "\n\n")
+		"Plan monthly, update balances a couple of times a year. Recording where income went "+
+			"is what makes contributions a record rather than a recollection, so the split "+
+			"between what you added and what you earned can be trusted.",
+		min(m.width-2, 76))) + "\n\n")
 
 	b.WriteString(styHeading.Render("Typing amounts") + "\n")
 	b.WriteString(styMuted.Render(wrap(
-		"Any amount field accepts arithmetic, so you can type what you actually know: "+
-			"450000+62000, 1200*12, (300000+150000)/2, or 8% of a figure. Commas, spaces and "+
-			"currency symbols are ignored, and (1000) means -1000.", min(m.width-2, 76))) + "\n\n")
+		"Any amount field accepts arithmetic: 450000+62000, 1200*12, (300000+150000)/2. "+
+			"Commas, spaces and currency symbols are ignored, and (1000) means -1000.",
+		min(m.width-2, 76))) + "\n\n")
 
 	b.WriteString(styHeading.Render("Where your data lives") + "\n")
 	b.WriteString(styMuted.Render(wrap(
 		"Everything - accounts, balances, settings and this application's own state - is in "+
-			"the single SQLite file shown in the top right. Nothing is stored anywhere else, so "+
-			"copying that file moves your whole setup, and opening someone else's works with no "+
-			"configuration. You can open it in any SQL client at the same time; the Query screen "+
-			"exists so you rarely need to.", min(m.width-2, 76))) + "\n\n")
+			"the single SQLite file named in the top right. Copying it moves your whole setup, "+
+			"and opening someone else's works with no configuration.",
+		min(m.width-2, 76))) + "\n\n")
 
-	b.WriteString(styFaint.Render("press any key to go back"))
-	return b.String()
+	return strings.TrimRight(b.String(), "\n")
 }

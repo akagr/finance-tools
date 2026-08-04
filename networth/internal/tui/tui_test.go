@@ -69,6 +69,10 @@ func press(t *testing.T, m *Model, keys ...string) {
 			msg = tea.KeyMsg{Type: tea.KeyTab}
 		case "shift+tab":
 			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
+		case "pgup":
+			msg = tea.KeyMsg{Type: tea.KeyPgUp}
+		case "pgdown":
+			msg = tea.KeyMsg{Type: tea.KeyPgDown}
 		case "ctrl+left":
 			msg = tea.KeyMsg{Type: tea.KeyCtrlLeft}
 		case "ctrl+right":
@@ -191,7 +195,8 @@ func TestHelpOverlayOpensAndCloses(t *testing.T) {
 	if !m.showHelp {
 		t.Fatal("? did not open help")
 	}
-	if !strings.Contains(m.View(), "Typing amounts") {
+	// Below the fold is fine - the keys come first - but it must be there.
+	if !strings.Contains(m.helpBody(), "Typing amounts") {
 		t.Error("help should explain that amount fields accept arithmetic")
 	}
 	press(t, m, "esc")
@@ -323,9 +328,9 @@ func TestInvalidAmountIsReportedNotSaved(t *testing.T) {
 	}
 }
 
-// Abandoning a half-finished round should take a deliberate second keystroke,
+// Abandoning a half-finished round should never happen on one keystroke,
 // because losing entered data to a stray key is unforgivable in a tool used
-// twice a year.
+// twice a year. esc steps out of the field first, then warns, then leaves.
 func TestCancellingAPartialRoundAsksTwice(t *testing.T) {
 	m := newModel(t, true)
 	press(t, m, "3")
@@ -338,12 +343,19 @@ func TestCancellingAPartialRoundAsksTwice(t *testing.T) {
 	if m.active != viewUpdate {
 		t.Fatal("the first esc should not have left the screen")
 	}
+	if !u.paused {
+		t.Error("the first esc should step out of the field")
+	}
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatal("the second esc should not have left the screen either")
+	}
 	if u.fieldErr == "" {
-		t.Error("the first esc should warn that the round will be discarded")
+		t.Error("the second esc should warn that the round will be discarded")
 	}
 	press(t, m, "esc")
 	if m.active != viewDashboard {
-		t.Error("the second esc should abandon the round")
+		t.Error("the third esc should abandon the round")
 	}
 }
 
@@ -1179,26 +1191,28 @@ func TestBareGlobalKeysStandDownWhileAScreenIsBusy(t *testing.T) {
 		t.Fatalf("ctrl+s did not reach the review step (phase %v)", u.phase)
 	}
 	if u.Focus() == focusIdle {
-		t.Fatal("an unsaved round must not leave the keyboard to the tab bar")
+		t.Fatal("an unsaved round must not leave every bare key to the tab bar")
 	}
 	press(t, m, "q")
 	if m.quitting {
 		t.Error("q quit the application and discarded an unsaved round")
 	}
+
+	// Navigation is a different matter. Leaving is not destructive - the round
+	// is still here on the way back - so refusing to navigate would only trap
+	// the user without protecting anything.
 	press(t, m, "1")
-	if m.active != viewUpdate {
-		t.Errorf("a digit navigated away from an unsaved round, to %s",
-			viewNames[m.active])
+	if m.active != viewDashboard {
+		t.Fatalf("a digit should still navigate, went to %s", viewNames[m.active])
 	}
-	press(t, m, "tab")
-	if m.active != viewUpdate {
-		t.Errorf("tab navigated away from an unsaved round, to %s",
-			viewNames[m.active])
+	press(t, m, "3")
+	if u.phase != phaseReview || !u.dirty() {
+		t.Error("the round should survive a trip to another screen")
 	}
 }
 
-// esc means "back out one step", never "jump somewhere else". On the review
-// step it returns to the entry it came from, and entered figures survive.
+// esc means "back out one step", never "jump somewhere else". Each press
+// undoes exactly one thing, and the destructive one comes last.
 func TestEscapeBacksOutOneStepAtATime(t *testing.T) {
 	m := newModel(t, true)
 	press(t, m, "3")
@@ -1217,11 +1231,24 @@ func TestEscapeBacksOutOneStepAtATime(t *testing.T) {
 		t.Error("backing out of the review discarded what was entered")
 	}
 
-	// Only now, with the round still dirty, does esc offer to leave - and it
-	// says so before it does it.
+	// Step two: out of the fields, which is what hands the bare keys back.
 	press(t, m, "esc")
 	if m.active != viewUpdate {
-		t.Fatalf("the first esc discarded a dirty round without asking, to %s",
+		t.Fatalf("esc stepping out of a field left the screen, to %s",
+			viewNames[m.active])
+	}
+	if !u.paused {
+		t.Error("esc should have stepped out of the entry fields")
+	}
+	if u.Focus() != focusBusy {
+		t.Errorf("stepped out of the fields, the screen still reports %v", u.Focus())
+	}
+
+	// Step three: leaving, which is the only destructive one and so is the only
+	// one that asks.
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatalf("esc discarded a dirty round without asking, to %s",
 			viewNames[m.active])
 	}
 	if !strings.Contains(m.View(), "esc again") {
@@ -1234,9 +1261,58 @@ func TestEscapeBacksOutOneStepAtATime(t *testing.T) {
 	}
 }
 
+// Arriving on a screen that puts the cursor in a field must not cost the user
+// the rest of the interface. Stepping out has to be possible without leaving,
+// and leaving has to be possible without stepping out.
+func TestTheEntryFieldsAreNotATrap(t *testing.T) {
+	m := newModel(t, true)
+	press(t, m, "3")
+	u := m.screens[viewUpdate].(*updateScreen)
+	if u.Focus() != focusTyping {
+		t.Fatal("the update screen should arrive ready to type")
+	}
+
+	// The chord works even mid-field.
+	press(t, m, "ctrl+right")
+	if m.active != viewAccounts {
+		t.Fatalf("ctrl+right did not leave the field, went to %s", viewNames[m.active])
+	}
+	press(t, m, "3")
+
+	// And esc steps out rather than leaving, so the digits come back.
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatalf("esc left the screen instead of the field, to %s", viewNames[m.active])
+	}
+	if u.Focus() == focusTyping {
+		t.Fatal("esc should have handed the keyboard back")
+	}
+	if !strings.Contains(m.header(), "1 Dashboard") {
+		t.Errorf("the digits should be advertised again once out of the field:\n%s",
+			m.header())
+	}
+	press(t, m, "2")
+	if m.active != viewPlan {
+		t.Errorf("a digit should navigate once out of the field, went to %s",
+			viewNames[m.active])
+	}
+
+	// The plan screen also arrives ready to type, and gets out the same way.
+	if m.screens[viewPlan].Focus() != focusTyping {
+		t.Error("the plan screen should arrive ready to type")
+	}
+	press(t, m, "esc")
+
+	// And the way back in is one key.
+	press(t, m, "3", "enter")
+	if u.Focus() != focusTyping {
+		t.Error("enter should put the cursor back in the field")
+	}
+}
+
 // The tab bar advertises digits. It must stop advertising them while they do
 // nothing, or the interface teaches a key that fails the first time it is used.
-func TestTabBarStopsAdvertisingDigitsWhileAScreenIsBusy(t *testing.T) {
+func TestTabBarStopsAdvertisingDigitsWhileAFieldIsTaking(t *testing.T) {
 	m := newModel(t, true)
 	press(t, m, "4")
 	if out := m.header(); !strings.Contains(out, "4 Accounts") {
@@ -1290,10 +1366,10 @@ func TestFooterKeepsTheWayOutWhenSpaceRunsOut(t *testing.T) {
 	}
 }
 
-// A figure that has been typed but not yet confirmed is still work. esc must
-// offer to discard it rather than leaving as though nothing was entered - the
-// screen appearing to change on its own is exactly how that looks from the
-// other side of the keyboard.
+// A figure that has been typed but not yet confirmed is still work. Stepping
+// out of the field commits it, and leaving still asks - the screen appearing to
+// change on its own is exactly how the alternative looks from the other side of
+// the keyboard.
 func TestEscapeAsksBeforeDiscardingAnUnconfirmedFigure(t *testing.T) {
 	m := newModel(t, true)
 	press(t, m, "3")
@@ -1303,18 +1379,72 @@ func TestEscapeAsksBeforeDiscardingAnUnconfirmedFigure(t *testing.T) {
 	if u.dirty() {
 		t.Fatal("the test assumes the figure has not been committed yet")
 	}
+
+	press(t, m, "esc")
+	if m.active != viewUpdate {
+		t.Fatalf("esc left the screen with a figure on it, landing on %s",
+			viewNames[m.active])
+	}
+	if !u.dirty() {
+		t.Error("stepping out of the field should keep what was typed")
+	}
 	if !strings.Contains(m.View(), "discard this round") {
-		t.Errorf("the footer should already warn that esc discards:\n%s", m.View())
+		t.Errorf("the footer should warn that esc now discards:\n%s", m.View())
 	}
 
 	press(t, m, "esc")
 	if m.active != viewUpdate {
-		t.Fatalf("esc discarded a typed figure without asking, landing on %s",
+		t.Fatalf("esc discarded the round without asking, landing on %s",
 			viewNames[m.active])
 	}
 	press(t, m, "esc")
 	if m.active != viewDashboard {
 		t.Errorf("a confirmed esc should leave the round, went to %s",
 			viewNames[m.active])
+	}
+}
+
+// The help screen is the backstop for someone who is already stuck, so it must
+// not run off the top of the terminal. The keys fit on one screen; the prose
+// below them scrolls, and says that it does.
+func TestHelpFitsTheScreenAndScrolls(t *testing.T) {
+	m := newModel(t, true)
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 44})
+	press(t, m, "?")
+	if !m.showHelp {
+		t.Fatal("? did not open the help")
+	}
+
+	out := m.View()
+	if lines := strings.Count(out, "\n") + 1; lines > 44 {
+		t.Errorf("the help rendered %d lines into a 44 line terminal", lines)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(out), "networth — keys") {
+		t.Errorf("the help must start at its title, not part way down:\n%s", out)
+	}
+	// Every screen's keys, not just the first few, without scrolling.
+	for _, want := range []string{"Anywhere at all", "Plan (monthly)", "Update",
+		"Forms (accounts, rules)", "Accounts", "Query"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the first screenful of help is missing %q", want)
+		}
+	}
+	if !strings.Contains(out, "more below") {
+		t.Errorf("the help must say when there is more to see:\n%s", out)
+	}
+
+	press(t, m, "pgdown")
+	if !m.showHelp {
+		t.Fatal("scrolling closed the help")
+	}
+	if m.helpScroll == 0 {
+		t.Error("pgdown did not scroll")
+	}
+	press(t, m, "esc")
+	if m.showHelp {
+		t.Error("esc should close the help")
+	}
+	if m.helpScroll != 0 {
+		t.Error("reopening the help should start at the top again")
 	}
 }

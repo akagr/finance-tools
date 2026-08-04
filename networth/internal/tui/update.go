@@ -43,6 +43,13 @@ type updateScreen struct {
 
 	confirmCancel bool
 	fieldErr      string
+
+	// paused means the entry fields have been stepped out of with esc. The
+	// round is untouched; only the keyboard has been handed back, so the digits
+	// and letters work again. Without it, arriving on this screen would put the
+	// cursor in a field with no way out except a key that leaves the screen -
+	// which is a trap however clearly it is signposted.
+	paused bool
 }
 
 type updatePhase int
@@ -140,10 +147,18 @@ func (u *updateScreen) syncInputs() {
 	} else {
 		u.addedInput.SetValue("")
 	}
+	// Moving between accounts while stepped out must not quietly grab the
+	// keyboard back: browsing the round is a different act from filling it in.
+	if u.paused {
+		u.balanceInput.Blur()
+		u.addedInput.Blur()
+		return
+	}
 	u.focusField()
 }
 
 func (u *updateScreen) focusField() {
+	u.paused = false
 	u.balanceInput.Blur()
 	u.addedInput.Blur()
 	if u.field == 0 {
@@ -155,6 +170,15 @@ func (u *updateScreen) focusField() {
 	}
 }
 
+// pause steps out of the fields without touching the round. What has been typed
+// is committed first, so stepping out never silently costs a figure.
+func (u *updateScreen) pause() {
+	u.commitField()
+	u.paused = true
+	u.balanceInput.Blur()
+	u.addedInput.Blur()
+}
+
 func (u *updateScreen) Focus() focusLevel {
 	if len(u.accounts) == 0 {
 		return focusIdle
@@ -164,7 +188,12 @@ func (u *updateScreen) Focus() focusLevel {
 		// Not typing, but an unsaved round is on screen: a bare q here would
 		// quit and throw it away.
 		return focusBusy
+	case phaseDate:
+		return focusTyping
 	default:
+		if u.paused {
+			return focusBusy
+		}
 		return focusTyping
 	}
 }
@@ -176,20 +205,29 @@ func (u *updateScreen) Hints() []hint {
 	case phaseReview:
 		return []hint{{"↵", "save"}, {"e", "back to editing"}, {"esc", "back to editing"}}
 	default:
-		// esc is the only bare key that leaves this screen, so it says what it
-		// will do rather than the ambiguous "cancel": the outcome should be
-		// legible before the key is pressed, not after.
-		leave := hint{"esc", "leave this round"}
-		if u.dirty() || u.pendingInput() {
-			leave = hint{"esc", "discard this round"}
+		// esc says what it will do rather than the ambiguous "cancel": the
+		// outcome should be legible before the key is pressed, not after. It
+		// only ever leaves once the fields have been stepped out of, so the
+		// first press can never cost anything.
+		if u.paused {
+			leave := hint{"esc", "leave this round"}
+			if u.dirty() {
+				leave = hint{"esc", "discard this round"}
+			}
+			return []hint{
+				{"↵", "type"},
+				{"↑↓", "account"},
+				{"ctrl+s", "save"},
+				{"ctrl+d", "date"},
+				leave,
+			}
 		}
 		return []hint{
 			{"↵", "next"},
 			{"⇥", "balance / added"},
 			{"↑↓", "account"},
 			{"ctrl+s", "save"},
-			{"ctrl+d", "date"},
-			leave,
+			{"esc", "stop typing"},
 		}
 	}
 }
@@ -231,20 +269,15 @@ func (u *updateScreen) updateDate(key tea.KeyMsg) tea.Cmd {
 	return cmd
 }
 
-func (u *updateScreen) updateEntry(key tea.KeyMsg) tea.Cmd {
-	if len(u.accounts) == 0 {
-		if key.String() == "esc" {
-			return func() tea.Msg { return switchViewMsg(viewAccounts) }
-		}
-		return nil
-	}
-
+// updatePaused handles the round with the cursor stepped out of the fields.
+// The round is intact; this is only about which keys mean what. Nothing here
+// types, so the digits and tab are free to navigate again.
+func (u *updateScreen) updatePaused(key tea.KeyMsg) tea.Cmd {
 	switch key.String() {
 	case "esc":
-		// A figure that has been typed counts as work even before it is
-		// confirmed with enter. Without this, esc looks like it discards
-		// nothing and quietly throws away what is on screen - which is exactly
-		// what makes leaving the round feel like the screen jumped on its own.
+		// Now, and only now, esc leaves - and asks first if there is anything
+		// to lose. Unparseable text counts as something to lose, since it was
+		// never committed and dirty() cannot see it.
 		if (u.dirty() || u.pendingInput()) && !u.confirmCancel {
 			u.confirmCancel = true
 			u.fieldErr = "esc again to discard this round"
@@ -252,6 +285,68 @@ func (u *updateScreen) updateEntry(key tea.KeyMsg) tea.Cmd {
 		}
 		u.reset()
 		return func() tea.Msg { return switchViewMsg(viewDashboard) }
+
+	case "enter", "i", "e":
+		u.focusField()
+		u.fieldErr = ""
+		return nil
+
+	case "up", "k":
+		if u.idx > 0 {
+			u.idx--
+			u.field = 0
+			u.syncInputs()
+		}
+		return nil
+
+	case "down", "j":
+		if u.idx < len(u.accounts)-1 {
+			u.idx++
+			u.field = 0
+			u.syncInputs()
+		}
+		return nil
+
+	case "ctrl+d":
+		u.dateInput.SetValue(u.date)
+		u.dateInput.Focus()
+		u.dateInput.CursorEnd()
+		u.phase = phaseDate
+		return nil
+
+	case "ctrl+s":
+		if !u.dirty() {
+			u.fieldErr = "nothing entered yet"
+			return nil
+		}
+		u.phase = phaseReview
+		return nil
+	}
+	u.confirmCancel = false
+	return nil
+}
+
+func (u *updateScreen) updateEntry(key tea.KeyMsg) tea.Cmd {
+	if len(u.accounts) == 0 {
+		if key.String() == "esc" {
+			return func() tea.Msg { return switchViewMsg(viewAccounts) }
+		}
+		return nil
+	}
+	if u.paused {
+		return u.updatePaused(key)
+	}
+
+	switch key.String() {
+	case "esc":
+		// esc steps out of the fields before it does anything drastic. One
+		// press hands the keyboard back - the round is untouched - and only
+		// from there does a second press leave, asking first if there is
+		// anything to lose. A screen whose only exit also discards work is not
+		// an exit.
+		u.pause()
+		u.fieldErr = ""
+		return nil
 
 	case "ctrl+d":
 		u.dateInput.SetValue(u.date)
@@ -412,6 +507,7 @@ func (u *updateScreen) reset() {
 	u.entries = map[int64]*draft{}
 	u.idx, u.field, u.phase = 0, 0, phaseEntry
 	u.confirmCancel, u.fieldErr = false, ""
+	u.paused = false
 	u.date = today()
 	u.balanceInput.SetValue("")
 	u.addedInput.SetValue("")
@@ -521,10 +617,10 @@ func (u *updateScreen) viewEntry(width, height int) string {
 	}
 	b.WriteString("\n")
 
-	b.WriteString(u.fieldRow(balanceLabel(a), u.balanceInput, u.field == 0))
+	b.WriteString(u.fieldRow(balanceLabel(a), u.balanceInput, !u.paused && u.field == 0))
 	b.WriteString(u.previewLine(a, last))
 	b.WriteString("\n")
-	b.WriteString(u.fieldRow("of which added", u.addedInput, u.field == 1))
+	b.WriteString(u.fieldRow("of which added", u.addedInput, !u.paused && u.field == 1))
 	if rec := u.recorded[a.ID]; rec != 0 {
 		b.WriteString("  " + pad("", 16, false) + styGain.Render("✓ ") + styMuted.Render(
 			u.m.fmts(rec)+" already recorded by your monthly plans — leave this blank") + "\n")
