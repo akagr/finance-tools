@@ -1041,3 +1041,71 @@ func TestTagFieldSuggestsExistingTags(t *testing.T) {
 			s.form.fields[6].options)
 	}
 }
+
+// Changing an account's tracking mode must never make it silently disappear
+// from the balance round. A unit-tracked account only drops out once it actually
+// holds something that can be valued from a price.
+func TestUnitTrackedAccountStaysInTheRoundUntilItHoldsSomething(t *testing.T) {
+	m := newModel(t, true)
+	id, err := m.store.AddAccount(store.Account{Name: "Vested RSUs", Kind: "asset",
+		Currency: "INR", InNetworth: true, Tracking: "units"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	u := m.screens[viewUpdate].(*updateScreen)
+	if err := u.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, a := range u.accounts {
+		if a.ID == id {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("a unit-tracked account holding nothing must still be askable by hand")
+	}
+
+	// Once it has holdings, its balance is derivable and asking would be noise.
+	inst, err := m.store.DB.Exec(`INSERT INTO instruments (symbol, currency) VALUES ('ACME','INR')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instID, _ := inst.LastInsertId()
+	if _, err := m.store.DB.Exec(`INSERT INTO trades
+		(account_id, instrument_id, as_of, quantity, currency)
+		VALUES (?,?,?,?,'INR')`, id, instID, "2026-01-01", 100*100000000); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range u.accounts {
+		if a.ID == id {
+			t.Error("once it holds something, its balance comes from the price")
+		}
+	}
+}
+
+// The bookkeeping counter-parties are not things anyone values by hand.
+func TestBookkeepingAccountsAreNotAskedFor(t *testing.T) {
+	m := newModel(t, true)
+	setupPlanRules(t, m)
+	press(t, m, "2")
+	p := m.screens[viewPlan].(*planScreen)
+	p.date = "2026-02-01"
+	typeText(t, m, "300000")
+	press(t, m, "ctrl+s")
+
+	u := m.screens[viewUpdate].(*updateScreen)
+	if err := u.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range u.accounts {
+		switch a.Name {
+		case store.ExternalAccount, store.IncomeAccount, store.SpendAccount:
+			t.Errorf("%s is bookkeeping and should not be asked for", a.Name)
+		}
+	}
+}
