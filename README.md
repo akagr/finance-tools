@@ -17,7 +17,7 @@ tied together by a root `go.work` workspace.
 | **correlation** | [`correlation/`](correlation/) | in progress      | Computes return **correlations** across assets (e.g. VWRA vs Nifty 50) to assess how diversified a portfolio really is.           |
 | **backtest**    | [`backtest/`](backtest/)       | complete         | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs), with walk-forward, parameter sweeps, Monte-Carlo and regime robustness tests. Research only — not advice. |
 | **papertrade**  | [`papertrade/`](papertrade/)   | complete         | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account, equity curve, performance vs benchmark) to validate it before risking capital. No real orders — not advice. |
-| **networth**    | [`networth/`](networth/)       | in progress      | Tracks **net worth** over time in a single SQLite file and separates **contributions from returns**, so XIRR is not flattered by how much you saved. Terminal interface (Bubble Tea), arbitrary SQL for anything the screens do not show. Not advice. |
+| **networth**    | [`networth/`](networth/)       | in progress      | Tracks **net worth** over time in a single SQLite file and separates **contributions from returns**, so XIRR is not flattered by how much you saved. Also plans **monthly routing** (income → spending, then split across investments) with a formula language, which is what makes the contribution figure a record rather than a guess. Terminal interface (Bubble Tea), arbitrary SQL for anything the screens do not show. Not advice. |
 
 ## Layout
 

@@ -46,7 +46,14 @@ in one `go.work` workspace:
   Returns are reported as both XIRR and Modified-Dietz-chained TWR — their gap is the
   contribution-timing effect. A Bubble Tea TUI is the primary interface. **This is the one
   module with external dependencies** (`modernc.org/sqlite`, Bubble Tea), a deliberate
-  scoped exception to the stdlib-only convention. See `networth/README.md`.
+  scoped exception to the stdlib-only convention. It also replaces the *monthly* routing
+  sheet: `internal/plan` is a two-stage waterfall (set-asides come off income, then the
+  rest is divided) evaluated in priority order so a rule can see what earlier ones left,
+  and `internal/expr` is a small exact-arithmetic formula language (`balance(...)`,
+  `owed("tag:type=credit_card")`, `remaining`, `min`/`max`/`clamp`) because real routing
+  refers to other accounts' balances. Executing a plan writes the money the way it
+  physically moves (income in, then transfers out), so contributions become a record
+  rather than a recollection. See `networth/README.md`.
 
 ## Commands
 

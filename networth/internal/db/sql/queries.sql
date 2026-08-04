@@ -61,3 +61,20 @@ ORDER BY days_stale DESC NULLS FIRST;
 -- name: quality
 -- desc: Everything that makes a reported number less trustworthy than it looks.
 SELECT severity, check_name, detail FROM v_quality ORDER BY severity, check_name;
+
+-- name: savings
+-- desc: How much of each month's income you kept, from executed plans.
+SELECT as_of, income, set_aside, saved, savings_rate_pct
+FROM v_savings_rate ORDER BY as_of DESC;
+
+-- name: routing
+-- desc: Where each month's money was routed.
+SELECT p.as_of, l.stage, l.label, a.name AS account, l.amount
+FROM plan_lines l
+JOIN plans p ON p.id = l.plan_id
+JOIN accounts a ON a.id = l.account_id
+ORDER BY p.as_of DESC, l.sort_order;
+
+-- name: monthly
+-- desc: Money crossing into net worth each month.
+SELECT month, net_contribution FROM v_contributions_monthly ORDER BY month DESC;

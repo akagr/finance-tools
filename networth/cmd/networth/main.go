@@ -20,8 +20,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/akagr/finance-tools/networth/internal/db"
+	"github.com/akagr/finance-tools/networth/internal/money"
+	"github.com/akagr/finance-tools/networth/internal/plan"
 	"github.com/akagr/finance-tools/networth/internal/report"
 	"github.com/akagr/finance-tools/networth/internal/store"
 	"github.com/akagr/finance-tools/networth/internal/tui"
@@ -51,6 +54,8 @@ func main() {
 		os.Exit(cmdQuery(args[1:]))
 	case "accounts":
 		os.Exit(cmdAccounts(args[1:]))
+	case "plan":
+		os.Exit(cmdPlan(args[1:]))
 	case "check":
 		os.Exit(cmdCheck(args[1:]))
 	case "doctor":
@@ -99,6 +104,7 @@ Commands:
   report      print a summary (text, markdown, csv or json)
   query       run a saved query, or any SQL, against the database
   accounts    list accounts
+  plan        work out where a month's income should go
   check       report anything that makes the numbers less trustworthy
   doctor      check the database file itself
   backup      write a timestamped copy of the database
@@ -446,4 +452,106 @@ func cmdBackup(args []string) int {
 	fmt.Println("wrote", path)
 	fmt.Printf("keeping the %d most recent in %s\n", *keep, filepath.Dir(path))
 	return 0
+}
+
+// cmdPlan applies the routing rules to an income figure without touching the
+// database, so the month's transfers can be checked - or scripted - before
+// anything is recorded.
+func cmdPlan(args []string) int {
+	fs := flag.NewFlagSet("plan", flag.ExitOnError)
+	dbPath := fs.String("db", "", "database file")
+	income := fs.String("income", "", "the month's income (accepts arithmetic)")
+	month := fs.String("month", "", "which month, as YYYY-MM (defaults to this one)")
+	record := fs.Bool("record", false, "save the plan and record where the money went")
+	rules := fs.Bool("rules", false, "list the routing rules instead")
+	fs.Parse(args)
+
+	d, s, _, err := openDB(*dbPath)
+	if err != nil {
+		return fail(err)
+	}
+	defer d.Close()
+	settings, _ := d.Settings()
+
+	if *rules {
+		rs, err := s.Rules()
+		if err != nil {
+			return fail(err)
+		}
+		if len(rs) == 0 {
+			fmt.Println("No routing rules yet. Run `networth` and press 2, then ctrl+r.")
+			return 0
+		}
+		fmt.Printf("%-4s %-24s %-22s %-34s %s\n", "PRI", "RULE", "TO", "HOW MUCH", "STAGE")
+		for _, r := range rs {
+			name := r.Name
+			if !r.Active {
+				name += " (off)"
+			}
+			fmt.Printf("%-4d %-24s %-22s %-34s %s\n",
+				r.Priority, name, r.Account, r.Describe(settings.Grouping), r.Stage)
+		}
+		return 0
+	}
+
+	if *income == "" {
+		return fail(fmt.Errorf("say how much came in, with --income"))
+	}
+	amount, err := money.Parse(*income)
+	if err != nil {
+		return fail(err)
+	}
+	res, err := s.ComputePlan(amount, nil)
+	if err != nil {
+		return fail(err)
+	}
+
+	asOf := *month
+	if asOf == "" {
+		asOf = time.Now().Format("2006-01")
+	}
+	if len(asOf) == 7 {
+		asOf += "-01"
+	}
+
+	fmt.Printf("Plan for %s on income of %s\n\n", asOf, fmtAmount(amount, settings))
+	for _, l := range res.Lines {
+		note := ""
+		if l.Stage == plan.StageSetAside {
+			note = "  (set aside)"
+		}
+		fmt.Printf("  %-26s -> %-22s %14s%s\n",
+			l.Label, l.Account, fmtAmount(l.Amount, settings), note)
+	}
+	fmt.Printf("\n  %-26s %17s\n", "Set aside", fmtAmount(res.SetAside, settings))
+	fmt.Printf("  %-26s %17s\n", "To invest", fmtAmount(res.Investable, settings))
+	if res.Unallocated != 0 {
+		fmt.Printf("  %-26s %17s\n", "Unallocated", fmtAmount(res.Unallocated, settings))
+	}
+	fmt.Printf("  %-26s %16.0f%%\n", "Routed to investments", res.InvestmentRate()*100)
+	for _, w := range res.Warnings {
+		fmt.Printf("\n  ! %s\n", w)
+	}
+
+	if !*record {
+		fmt.Println("\nNothing recorded. Add --record to save this and log where the money went.")
+		return 0
+	}
+	planID, err := s.SavePlan(asOf, amount, res, "")
+	if err != nil {
+		return fail(err)
+	}
+	if err := s.ExecutePlan(planID); err != nil {
+		return fail(err)
+	}
+	fmt.Printf("\nRecorded %s.\n", asOf)
+	return 0
+}
+
+func fmtAmount(a money.Amount, s db.Settings) string {
+	sym := ""
+	if s.Grouping == money.GroupIndian {
+		sym = "\u20b9"
+	}
+	return sym + a.Format(s.Decimals, s.Grouping)
 }

@@ -451,3 +451,49 @@ SELECT 'rough_valuation', 'warning',
 FROM v_balances_base
 WHERE in_networth = 1 AND anchor_confidence IN ('estimate', 'rough')
   AND as_of = (SELECT MAX(d) FROM v_event_dates);
+
+-- Planning views.
+--
+-- Because a monthly plan writes income and spending as real boundary crossings,
+-- the savings rate and the contribution history are derivable rather than
+-- separately maintained figures - they are the same facts read a different way.
+
+DROP VIEW IF EXISTS v_savings_rate;
+DROP VIEW IF EXISTS v_plan_summary;
+DROP VIEW IF EXISTS v_contributions_monthly;
+
+CREATE VIEW v_plan_summary AS
+SELECT
+    p.id,
+    p.as_of,
+    p.income,
+    p.status,
+    COALESCE(SUM(CASE WHEN l.stage = 'setaside' THEN l.amount END), 0) AS set_aside,
+    COALESCE(SUM(CASE WHEN l.stage = 'invest'   THEN l.amount END), 0) AS invested,
+    p.income - COALESCE(SUM(l.amount), 0)                             AS unallocated
+FROM plans p
+LEFT JOIN plan_lines l ON l.plan_id = p.id
+GROUP BY p.id, p.as_of, p.income, p.status;
+
+-- The share of income that was not spent. Only executed plans count: a draft is
+-- an intention, and intentions do not belong in a record of what happened.
+CREATE VIEW v_savings_rate AS
+SELECT
+    as_of,
+    income,
+    set_aside,
+    income - set_aside AS saved,
+    CASE WHEN income > 0
+         THEN ROUND(100.0 * (income - set_aside) / income, 1) END AS savings_rate_pct
+FROM v_plan_summary
+WHERE status = 'executed';
+
+-- Money crossing into net worth, by month. With monthly plans this is a
+-- near-complete record of contributions rather than a twice-yearly estimate,
+-- which is what sharpens every return figure that depends on it.
+CREATE VIEW v_contributions_monthly AS
+SELECT
+    strftime('%Y-%m', as_of) AS month,
+    SUM(net_flow)            AS net_contribution
+FROM v_flows
+GROUP BY month;
