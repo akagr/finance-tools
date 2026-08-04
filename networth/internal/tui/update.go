@@ -89,10 +89,21 @@ func (u *updateScreen) Refresh() error {
 	if err != nil {
 		return err
 	}
-	// The external counter-party is bookkeeping, not something to be valued.
+	// A unit-tracked account is valued from quantity times price, so it only
+	// drops out of the round once it actually holds something. Until then it is
+	// entered by hand like anything else, because an account that silently
+	// disappears is worse than one that asks a redundant question.
+	holdings, err := u.m.store.AccountsWithHoldings()
+	if err != nil {
+		return err
+	}
 	var tracked []store.Account
 	for _, a := range accts {
-		if a.Name == store.ExternalAccount || a.Tracking == "units" {
+		if a.Name == store.ExternalAccount || a.Name == store.IncomeAccount ||
+			a.Name == store.SpendAccount {
+			continue
+		}
+		if a.Tracking == "units" && holdings[a.ID] {
 			continue
 		}
 		tracked = append(tracked, a)

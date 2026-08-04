@@ -296,7 +296,8 @@ func newAccountForm(m *Model, a store.Account, editing bool) *accountForm {
 			[]string{"yes", "no"}),
 		newChoiceField("Tracked by",
 			"snapshots: you state the balance now and then. transactions: it is "+
-				"the sum of what went in and out. units: quantity times price.",
+				"the sum of what went in and out. units: quantity times price — "+
+				"prices are not fetched yet, so this still asks for a balance.",
 			[]string{"snapshots", "transactions", "units"}),
 		newTextField("Institution", "optional — the bank, broker or provider"),
 		newSuggestField("Tags", "key=value, comma separated. Any dimension you want to "+

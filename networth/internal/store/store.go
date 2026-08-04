@@ -512,3 +512,27 @@ func nullIfEmpty(s string) any {
 	}
 	return s
 }
+
+// AccountsWithHoldings reports which accounts have recorded unit trades, and so
+// can have a balance derived from quantity times price.
+//
+// It exists so that an account marked as unit-tracked but holding nothing yet
+// still appears in the balance round. Dropping it would make an account silently
+// vanish the moment its tracking mode changed, which is the sort of quiet
+// disappearance that costs a year of data before anyone notices.
+func (s *Store) AccountsWithHoldings() (map[int64]bool, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT account_id FROM trades WHERE scenario_id = 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
