@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [itr-foreign, correlation, backtest, papertrade]
+        module: [itr-foreign, correlation, backtest, papertrade, networth]
     defaults:
       run:
         working-directory: ${{ matrix.module }}
@@ -25,7 +25,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: ${{ matrix.module }}/go.mod
-          # No external dependencies, so module caching adds nothing.
+          # Most modules are stdlib-only and have no go.sum, which the cache
+          # step requires, so caching is off for all of them.
           cache: false
 
       - name: gofmt

@@ -34,6 +34,20 @@ in one `go.work` workspace:
   per the isolated-module convention); a `broker.PaperBroker` mirrors the backtest cost model and
   buys are capped to available cash. Places **no real orders**. See `papertrade/README.md`.
 
+- **`networth/`** — tracks **net worth** over time and separates **contributions from
+  returns**, the thing a balance-only spreadsheet cannot do. A **single SQLite file is the
+  sole source of truth**: financial data, settings and the interface's own state all live in
+  it, so pointing the binary at any file (including someone else's) works with no config;
+  it is created if missing. Facts live in tables, every derived figure is a **view**
+  reinstalled from embedded SQL on each open (`internal/db/sql/views.sql`), so hand-editing
+  in `sqlite3` can never leave a stale cache. `accounts.in_networth` is the load-bearing
+  column: transfers between accounts you own net to zero and are structurally *not*
+  contributions. Money is `INTEGER` scaled by 1e8 (exact *and* `SUM()`-able in ad-hoc SQL).
+  Returns are reported as both XIRR and Modified-Dietz-chained TWR — their gap is the
+  contribution-timing effect. A Bubble Tea TUI is the primary interface. **This is the one
+  module with external dependencies** (`modernc.org/sqlite`, Bubble Tea), a deliberate
+  scoped exception to the stdlib-only convention. See `networth/README.md`.
+
 ## Commands
 
 This is a `go.work` workspace. **Run all `go` commands from inside `itr-foreign/`** — `go ...
@@ -147,6 +161,11 @@ is shared by both branches, so FA and FSI can never disagree about a country cod
   **not vendored** (gitignored); fetch via the README curl / `itrforeign fetch-prices` (Yahoo
   chart API). `data/entities/*.csv` (issuer address/ZIP/country-code overrides) **is** committed.
 - Test fixtures are synthetic (e.g. account `U1234567`, "Jane Doe"). Keep them that way.
+- **`networth`'s `.db` file is the most sensitive artifact in the repo** — a complete net
+  worth, every account and every balance. `*.db`, its WAL/shm sidecars and
+  `networth/backups/` are gitignored. It is the *only* copy of the data (no plain-text
+  fallback by design), so `networth backup` (atomic `VACUUM INTO`) matters more than it
+  would elsewhere.
 
 ## Notes
 
