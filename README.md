@@ -2,59 +2,39 @@
 
 [![CI](https://github.com/akagr/finance-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/akagr/finance-tools/actions/workflows/ci.yml)
 
-A monorepo of small, focused personal-finance tools built from broker/market data —
-Indian tax filing and beyond. Each tool is an isolated Go module under its own directory,
-tied together by a root `go.work` workspace.
-
-> The badge and module paths assume the repo slug `github.com/akagr/finance-tools`; adjust if
-> your remote differs (also in `itr-foreign/go.mod` and `go.work`).
-
-## Tools
+Personal-finance tooling for Indian investors, built from broker data. Currently one tool:
 
 | Tool            | Directory                      | Status           | What it does                                                                                                                      |
 |-----------------|--------------------------------|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | **itr-foreign** | [`itr-foreign/`](itr-foreign/) | complete (M0–M8) | Generates ready-to-use **Schedule FA** (Foreign Assets, calendar year) plus **Schedule FSI/TR** (foreign income and tax relief, financial year, Rule 115) and a Form 67 worksheet for the Indian ITR, from **Interactive Brokers (IBKR)** holdings. |
-| **correlation** | [`correlation/`](correlation/) | in progress      | Computes return **correlations** across assets (e.g. VWRA vs Nifty 50) to assess how diversified a portfolio really is.           |
-| **backtest**    | [`backtest/`](backtest/)       | complete         | Offline **backtester** for rule-based strategies on NSE daily data (SMA/EMA crossover, momentum, RSI, Donchian breakout vs buy-and-hold, realistic costs), with walk-forward, parameter sweeps, Monte-Carlo and regime robustness tests. Research only — not advice. |
-| **papertrade**  | [`papertrade/`](papertrade/)   | complete         | Runs a strategy **forward** on live data with **simulated** fills (persistent paper account, equity curve, performance vs benchmark) to validate it before risking capital. No real orders — not advice. |
-| **networth**    | [`networth/`](networth/)       | in progress      | Tracks **net worth** over time in a single SQLite file and separates **contributions from returns**, so XIRR is not flattered by how much you saved. Also plans **monthly routing** (income → spending, then split across investments) with a formula language, which is what makes the contribution figure a record rather than a guess. Terminal interface (Bubble Tea), arbitrary SQL for anything the screens do not show. Not advice. |
+
+It is an isolated Go module (stdlib only) under its own directory, with a root `go.work`
+workspace so future tools can be added as sibling directories.
+
+> The badge and module path assume the repo slug `github.com/akagr/finance-tools`; adjust if
+> your remote differs (also in `itr-foreign/go.mod` and `go.work`).
 
 ## Layout
 
 ```
 finance-tools/
-  go.work            # ties all tool modules together
-  itr-foreign/       # each tool: its own go.mod, cmd/, internal/, docs/, data/
-  networth/          # the one module with external deps (SQLite, Bubble Tea)
+  go.work            # workspace
+  itr-foreign/       # the tool: its own go.mod, cmd/, internal/, docs/, data/
   …                  # future tools as sibling directories
 ```
 
-## Algorithmic-trading roadmap
-
-The **backtest** tool is Phase 1 of a deliberately staged path from idea to (maybe) live
-capital — money is the last step, not the first:
-
-1. **Backtesting** *(done)* — measure a rule's edge on history vs a benchmark; compare strategies,
-   rank by risk-adjusted metrics, and size positions by volatility.
-2. **Robustness & validation** *(done)* — walk-forward folds, parameter sweeps, walk-forward
-   optimisation (re-fit parameters out-of-sample), Monte-Carlo bootstrap and regime analysis all
-   stress-test an edge from different angles.
-3. **Paper trading** *(built)* — the `papertrade/` module runs a strategy forward on live data
-   with simulated fills, a persistent account, a daily equity curve and performance-vs-benchmark
-   reporting, to validate it over weeks at zero capital.
-4. **Live, bounded, tiny** — only if an edge survives, as an approved rule-based bot with hard
-   risk limits and SEBI algo registration.
-
-Most ideas should die in steps 1–2 — cheaply, on a laptop. See
-[`backtest/README.md`](backtest/README.md#roadmap) for the detailed roadmap.
-
 ## Building
 
-Requires Go (not currently installed on this machine — `brew install go`).
+Requires Go 1.26. Run `go` commands from inside the module directory:
 
 ```sh
-go build ./...        # from repo root, builds every module in the workspace
+cd itr-foreign
+go build ./cmd/itrforeign
+go test ./...
 ```
+
+See [`itr-foreign/README.md`](itr-foreign/README.md) for usage, the IBKR Flex Query setup and
+the data files the tool needs.
 
 > **Disclaimer:** Nothing here is tax advice. Output is a working draft to be verified by
 > the taxpayer or a qualified professional before filing.
@@ -62,4 +42,3 @@ go build ./...        # from repo root, builds every module in the workspace
 ## License
 
 [MIT](LICENSE) © Akash Agrawal
-</content>
