@@ -1,9 +1,3 @@
 go 1.26
 
-use (
-	./itr-foreign
-	./correlation
-	./backtest
-	./papertrade
-	./networth
-)
+use ./itr-foreign

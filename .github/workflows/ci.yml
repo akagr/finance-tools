@@ -10,23 +10,19 @@ permissions:
 
 jobs:
   test:
-    name: build & test (${{ matrix.module }})
+    name: build & test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        module: [itr-foreign, correlation, backtest, papertrade, networth]
     defaults:
       run:
-        working-directory: ${{ matrix.module }}
+        working-directory: itr-foreign
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: ${{ matrix.module }}/go.mod
-          # Most modules are stdlib-only and have no go.sum, which the cache
-          # step requires, so caching is off for all of them.
+          go-version-file: itr-foreign/go.mod
+          # The module is stdlib-only and has no go.sum, which the cache step
+          # requires, so caching is off.
           cache: false
 
       - name: gofmt

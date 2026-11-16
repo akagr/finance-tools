@@ -4,56 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A monorepo of Go tools for Indian investors, all zero-dependency (Go stdlib only), Go 1.26,
-in one `go.work` workspace:
+A Go repo holding one tool for Indian investors, zero-dependency (Go stdlib only), Go 1.26,
+in a `go.work` workspace so future tools can be added as sibling modules:
 
 - **`itr-foreign/`** — a CLI that turns Interactive Brokers (IBKR) holdings into Indian ITR
   schedules: `fa` builds **Schedule FA** (Foreign Assets, calendar year) and `fsi` builds
   **Schedule FSI + TR** (foreign income and tax relief, financial year) with a Form 67
-  worksheet. The most developed tool; most of this doc is about it.
-- **`correlation/`** — computes return **correlations** across assets to gauge portfolio
-  diversification (CSV/Yahoo-driven, md/csv/json output).
-- **`backtest/`** — an offline **backtester** for rule-based strategies on NSE daily data
-  (trend, momentum, mean-reversion and breakout rules vs a buy-and-hold benchmark, realistic
-  costs). Each strategy lives in its own file under `internal/strategy/` and is registered in
-  `pipeline.buildStrategy`; `--strategy all` compares them in one table, `--sort` ranks it, and
-  `--vol-target` adds a volatility-targeting position-sizing overlay (the benchmark stays
-  unscaled). A `walkforward` command splits history into out-of-sample folds (with `--optimize`
-  re-fitting parameters per fold), and a `sweep` command maps the metric surface over a 1-D/2-D
-  parameter grid (plateau vs overfit spike), a `montecarlo` command bootstraps daily returns to
-  gauge how much of a result is luck, and a `regime` command splits performance by market state
-  (bull/bear, high/low vol). A research tool: output is not advice, and a backtest is a hypothesis
-  fit to the past, not a forecast. See `backtest/README.md`.
-- **`papertrade/`** — runs a strategy **forward** on live Yahoo data with **simulated** fills and
-  a persistent account (`account.json`, `fills.jsonl`, `equity.jsonl` under a `--dir`). Commands:
-  `init`, `step` (act on the newest unprocessed daily bar; idempotent per bar; records a daily
-  marked-to-market equity snapshot even with no trade), `status` (marked to market), `summary`
-  (performance over the tracked period vs a buy-and-hold benchmark, via `internal/perf`),
-  `history`, `list` (multi-account overview under a `--root`), and `export` (equity/fills to CSV).
-  Reuses copies of backtest's `strategy` and `yahoo` packages (kept in sync manually,
-  per the isolated-module convention); a `broker.PaperBroker` mirrors the backtest cost model and
-  buys are capped to available cash. Places **no real orders**. See `papertrade/README.md`.
-
-- **`networth/`** — tracks **net worth** over time and separates **contributions from
-  returns**, the thing a balance-only spreadsheet cannot do. A **single SQLite file is the
-  sole source of truth**: financial data, settings and the interface's own state all live in
-  it, so pointing the binary at any file (including someone else's) works with no config;
-  it is created if missing. Facts live in tables, every derived figure is a **view**
-  reinstalled from embedded SQL on each open (`internal/db/sql/views.sql`), so hand-editing
-  in `sqlite3` can never leave a stale cache. `accounts.in_networth` is the load-bearing
-  column: transfers between accounts you own net to zero and are structurally *not*
-  contributions. Money is `INTEGER` scaled by 1e8 (exact *and* `SUM()`-able in ad-hoc SQL).
-  Returns are reported as both XIRR and Modified-Dietz-chained TWR — their gap is the
-  contribution-timing effect. A Bubble Tea TUI is the primary interface. **This is the one
-  module with external dependencies** (`modernc.org/sqlite`, Bubble Tea), a deliberate
-  scoped exception to the stdlib-only convention. It also replaces the *monthly* routing
-  sheet: `internal/plan` is a two-stage waterfall (set-asides come off income, then the
-  rest is divided) evaluated in priority order so a rule can see what earlier ones left,
-  and `internal/expr` is a small exact-arithmetic formula language (`balance(...)`,
-  `owed("tag:type=credit_card")`, `remaining`, `min`/`max`/`clamp`) because real routing
-  refers to other accounts' balances. Executing a plan writes the money the way it
-  physically moves (income in, then transfers out), so contributions become a record
-  rather than a recollection. See `networth/README.md`.
+  worksheet.
 
 ## Commands
 
@@ -168,11 +125,6 @@ is shared by both branches, so FA and FSI can never disagree about a country cod
   **not vendored** (gitignored); fetch via the README curl / `itrforeign fetch-prices` (Yahoo
   chart API). `data/entities/*.csv` (issuer address/ZIP/country-code overrides) **is** committed.
 - Test fixtures are synthetic (e.g. account `U1234567`, "Jane Doe"). Keep them that way.
-- **`networth`'s `.db` file is the most sensitive artifact in the repo** — a complete net
-  worth, every account and every balance. `*.db`, its WAL/shm sidecars and
-  `networth/backups/` are gitignored. It is the *only* copy of the data (no plain-text
-  fallback by design), so `networth backup` (atomic `VACUUM INTO`) matters more than it
-  would elsewhere.
 
 ## Notes
 
