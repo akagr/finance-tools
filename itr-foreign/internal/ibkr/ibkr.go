@@ -226,7 +226,17 @@ func ParseFlexPeriod(r io.Reader, period Period) (*model.Statement, error) {
 		}
 
 		// Trades within the year.
-		for _, t := range st.Trades.Trades {
+		var parent *flexTrade
+		for i := range st.Trades.Rows {
+			t := &st.Trades.Rows[i]
+			tag := t.XMLName.Local
+			if tag != "Trade" && tag != "Lot" {
+				continue
+			}
+			isLot := tag == "Lot" || strings.EqualFold(t.LevelOfDetail, "CLOSED_LOT")
+			if !isLot {
+				parent = t
+			}
 			d := mustDate(firstNonEmpty(t.TradeDate, t.DateTime))
 			if !inYear(d) {
 				continue
@@ -239,10 +249,11 @@ func ParseFlexPeriod(r io.Reader, period Period) (*model.Statement, error) {
 			// A CLOSED_LOT row is IBKR's per-lot breakdown of a closing trade,
 			// not a separate execution — counting it as a trade would double the
 			// proceeds. It is the capital-gains input instead.
-			if strings.EqualFold(t.LevelOfDetail, "CLOSED_LOT") {
+			if isLot {
+				proceeds, commission := lotShare(t, parent)
 				out.RealizedLots = append(out.RealizedLots, closedLot(inst, d, t.Currency,
-					t.Quantity, t.Proceeds, firstNonEmpty(t.Cost, t.CostBasis, t.CostBasisMoney),
-					t.IBCommission, t.FifoPnlRealized,
+					t.Quantity, proceeds, firstNonEmpty(t.Cost, t.CostBasis, t.CostBasisMoney),
+					commission, t.FifoPnlRealized,
 					firstNonEmpty(t.HoldingPeriodDateTime, t.OpenDateTime)))
 				continue
 			}
@@ -258,8 +269,8 @@ func ParseFlexPeriod(r io.Reader, period Period) (*model.Statement, error) {
 			// Flex can instead nest the closed-lot breakdown inside the trade.
 			for _, l := range t.Lots {
 				out.RealizedLots = append(out.RealizedLots, closedLot(inst, d, t.Currency,
-					l.Quantity, l.Proceeds, firstNonEmpty(l.Cost, l.CostBasis, l.CostBasisMoney),
-					l.IBCommission, l.FifoPnlRealized,
+					l.Quantity, parseRat(l.Proceeds), firstNonEmpty(l.Cost, l.CostBasis, l.CostBasisMoney),
+					parseRat(l.IBCommission), l.FifoPnlRealized,
 					firstNonEmpty(l.HoldingPeriodDateTime, l.OpenDateTime)))
 			}
 		}
@@ -390,8 +401,10 @@ type flexStatement struct {
 	OpenPositions struct {
 		Positions []flexOpenPosition `xml:"OpenPosition"`
 	} `xml:"OpenPositions"`
+	// Every child, in document order: IBKR can emit a closing trade's
+	// CLOSED_LOT breakdown as sibling <Lot> rows after its EXECUTION row.
 	Trades struct {
-		Trades []flexTrade `xml:"Trade"`
+		Rows []flexTrade `xml:",any"`
 	} `xml:"Trades"`
 	CashTransactions struct {
 		Txns []flexCashTxn `xml:"CashTransaction"`
@@ -444,6 +457,7 @@ type flexLot struct {
 }
 
 type flexTrade struct {
+	XMLName           xml.Name
 	AssetCategory     string `xml:"assetCategory,attr"`
 	Symbol            string `xml:"symbol,attr"`
 	ISIN              string `xml:"isin,attr"`
@@ -547,17 +561,36 @@ func classify(t string) txnKind {
 // Quantity, cost and proceeds are stored as positive magnitudes; the reported
 // fifoPnlRealized is retained so the gains engine can cross-check the
 // arithmetic (and so short covers, whose signs invert, get flagged).
-func closedLot(inst model.Instrument, closeDate time.Time, cur, qty, proceeds, cost, commission, pnl, openDate string) model.RealizedLot {
+func closedLot(inst model.Instrument, closeDate time.Time, cur, qty string, proceeds *big.Rat, cost string, commission *big.Rat, pnl, openDate string) model.RealizedLot {
 	return model.RealizedLot{
 		Instrument:  inst,
 		OpenDate:    mustDate(openDate),
 		CloseDate:   closeDate,
 		Quantity:    absRat(parseRat(qty)),
 		Cost:        model.NewMoney(model.Currency(cur), absRat(parseRat(cost))),
-		Proceeds:    model.NewMoney(model.Currency(cur), absRat(parseRat(proceeds))),
-		Commission:  money(cur, commission),
+		Proceeds:    model.NewMoney(model.Currency(cur), absRat(proceeds)),
+		Commission:  model.NewMoney(model.Currency(cur), commission),
 		RealizedPnL: money(cur, pnl),
 	}
+}
+
+// lotShare returns a closed lot's proceeds and commission. IBKR leaves both
+// blank on sibling <Lot> rows, so they are apportioned by quantity from the
+// preceding execution of the same instrument. Without one they stay zero and
+// the gains engine's P&L cross-check flags the lot.
+func lotShare(lot, parent *flexTrade) (proceeds, commission *big.Rat) {
+	proceeds, commission = parseRat(lot.Proceeds), parseRat(lot.IBCommission)
+	if strings.TrimSpace(lot.Proceeds) != "" || parent == nil ||
+		instKey(parent.ISIN, parent.Symbol) != instKey(lot.ISIN, lot.Symbol) {
+		return proceeds, commission
+	}
+	total := absRat(parseRat(parent.Quantity))
+	if total.Sign() == 0 {
+		return proceeds, commission
+	}
+	frac := new(big.Rat).Quo(absRat(parseRat(lot.Quantity)), total)
+	return new(big.Rat).Mul(parseRat(parent.Proceeds), frac),
+		new(big.Rat).Mul(parseRat(parent.IBCommission), frac)
 }
 
 func side(s string) model.Side {

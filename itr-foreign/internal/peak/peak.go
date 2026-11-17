@@ -6,7 +6,8 @@
 //     (pre- and post-fill) and the 31-Dec close — and the max INR value is taken.
 //     Exact for buy-and-hold; a documented approximation otherwise.
 //   - Mode B (M4): exact. Reconstruct a daily share-count series from trades and
-//     value it against a daily price series and that day's TTBR, maximising INR
+//     value it against a daily price series and that day's TTBR (and at each
+//     fill, so intraday round trips count), maximising INR
 //     over the calendar year. ComputeExact additionally returns the true
 //     portfolio (Table A2) peak: the maximum daily NAV across all holdings.
 //
@@ -65,18 +66,30 @@ func ComputeExact(s *model.Statement, store fx.Store, prices PriceProvider) (sec
 	jan1 := time.Date(s.Year, time.January, 1, 0, 0, 0, 0, time.UTC)
 	dec31 := time.Date(s.Year, time.December, 31, 0, 0, 0, 0, time.UTC)
 
-	// Earliest acquisition date per instrument (from lots): a holding acquired
-	// mid-year via a non-trade event (reward, transfer-in) cannot be unwound from
-	// trades, so we must not value it before it was actually held.
+	// Earliest acquisition date per instrument: a holding acquired mid-year via a
+	// non-trade event (reward, transfer-in) cannot be unwound from trades, so we
+	// must not value it before it was actually held. Lots closed during the year
+	// and buys count too, or a position sold and re-bought would only be valued
+	// from the re-buy.
 	acquired := map[string]time.Time{}
-	for _, l := range s.Lots {
-		k := instKey(l.Instrument)
-		a := l.AcquiredOn()
+	noteAcquired := func(inst model.Instrument, a time.Time) {
 		if a.IsZero() {
-			continue
+			return
 		}
+		k := instKey(inst)
 		if e, ok := acquired[k]; !ok || a.Before(e) {
 			acquired[k] = a
+		}
+	}
+	for _, l := range s.Lots {
+		noteAcquired(l.Instrument, l.AcquiredOn())
+	}
+	for _, l := range s.RealizedLots {
+		noteAcquired(l.Instrument, l.OpenDate)
+	}
+	for _, t := range s.Trades {
+		if t.Side == model.Buy {
+			noteAcquired(t.Instrument, t.Date)
 		}
 	}
 
@@ -101,14 +114,29 @@ func ComputeExact(s *model.Statement, store fx.Store, prices PriceProvider) (sec
 		for _, k := range order {
 			h := holdings[k]
 			st := states[k]
+			a, hasAcq := acquired[k]
 			for st.ti < len(h.trades) && !h.trades[st.ti].Date.After(d) {
-				st.pos.Add(st.pos, signedQty(h.trades[st.ti]))
+				t := h.trades[st.ti]
+				pre := new(big.Rat).Set(st.pos)
+				st.pos.Add(st.pos, signedQty(t))
 				st.ti++
+				// Value the position at each fill too: a position opened and
+				// closed within a day is flat at every close.
+				if hasAcq && d.Before(a) {
+					continue
+				}
+				units := st.pos
+				if pre.Cmp(units) > 0 {
+					units = pre
+				}
+				if conv, ok := valueAt(store, units, t.Price, d); ok && (!st.have || conv.Result.Amount.Cmp(st.best.Result.Amount) > 0) {
+					st.best, st.have = conv, true
+				}
 			}
 			if st.pos.Sign() <= 0 {
 				continue
 			}
-			if a, ok := acquired[k]; ok && d.Before(a) {
+			if hasAcq && d.Before(a) {
 				continue // not yet held on this day
 			}
 			dayHeld = true
@@ -194,6 +222,14 @@ func computeApprox(s *model.Statement, store fx.Store) []Result {
 		out = append(out, Result{Instrument: h.inst, Peak: best, HasValue: have, Approximated: true})
 	}
 	return out
+}
+
+func valueAt(store fx.Store, units *big.Rat, price model.Money, d time.Time) (fx.Conversion, bool) {
+	if units.Sign() <= 0 || price.Amount == nil || price.Amount.Sign() <= 0 {
+		return fx.Conversion{}, false
+	}
+	conv, err := fx.Convert(store, model.NewMoney(price.Currency, new(big.Rat).Mul(units, price.Amount)), d)
+	return conv, err == nil
 }
 
 // --- grouping ---

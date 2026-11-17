@@ -126,3 +126,34 @@ func TestComputePeakBeforeSale(t *testing.T) {
 		t.Errorf("peak = %s, want 160000 (value just before the sale)", got.RatString())
 	}
 }
+
+// Sold out and re-bought: the year-end lot dates from the re-buy, but the
+// earlier holding must still be valued. A same-day round trip is flat at every
+// close, so only its fills can show it was held.
+func TestComputeExactSoldAndRebought(t *testing.T) {
+	other := model.Instrument{Symbol: "BBB", ISIN: "X2", Currency: model.USD}
+	st := &model.Statement{
+		Year:          2024,
+		OpenPositions: []model.Position{{Instrument: inst, Date: day(2024, 12, 31), Quantity: big.NewRat(10, 1), MarkPrice: usd(100)}},
+		Lots:          []model.Lot{{Instrument: inst, OpenDate: day(2024, 11, 1), Quantity: big.NewRat(10, 1)}},
+		RealizedLots:  []model.RealizedLot{{Instrument: inst, OpenDate: day(2024, 3, 1), CloseDate: day(2024, 11, 1)}},
+		Trades: []model.Trade{
+			{Instrument: inst, Date: day(2024, 3, 1), Side: model.Buy, Quantity: big.NewRat(10, 1), Price: usd(100)},
+			{Instrument: inst, Date: day(2024, 11, 1), Side: model.Sell, Quantity: big.NewRat(10, 1), Price: usd(100)},
+			{Instrument: inst, Date: day(2024, 11, 1), Side: model.Buy, Quantity: big.NewRat(10, 1), Price: usd(100)},
+			{Instrument: other, Date: day(2024, 11, 1), Side: model.Buy, Quantity: big.NewRat(5, 1), Price: usd(200)},
+			{Instrument: other, Date: day(2024, 11, 1), Side: model.Sell, Quantity: big.NewRat(5, 1), Price: usd(200)},
+		},
+	}
+	prices := fakePrices{base: big.NewRat(100, 1), spike: big.NewRat(300, 1), spikeDay: day(2024, 7, 1)}
+	secs, _, _, err := ComputeExact(st, fakeStore{big.NewRat(80, 1)}, prices)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]int64{"X1": 240000, "X2": 80000} // 10*300*80 on 1-Jul; 5*200*80 at the fill
+	for _, s := range secs {
+		if got := s.Peak.Result.Amount; !s.HasValue || got.Cmp(big.NewRat(want[s.Instrument.ISIN], 1)) != 0 {
+			t.Errorf("%s peak = %v, want %d", s.Instrument.ISIN, got, want[s.Instrument.ISIN])
+		}
+	}
+}

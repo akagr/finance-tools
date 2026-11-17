@@ -151,3 +151,25 @@ func TestBuildExitedPositionHasNoClosing(t *testing.T) {
 		t.Errorf("acquired = %q, want 2024-02-01", row.AcquiredOn)
 	}
 }
+
+// Lots closed during the year are interests held in it, so they count towards
+// the initial value and acquisition date, alongside the lot re-bought later.
+func TestBuildIncludesLotsClosedInYear(t *testing.T) {
+	inst := model.Instrument{Symbol: "AAA", ISIN: "X1", Name: "Alpha Inc", AssetClass: "STK", ListingCtry: "US", Currency: model.USD}
+	st := &model.Statement{
+		Year:          2024,
+		OpenPositions: []model.Position{{Instrument: inst, Date: day(2024, 12, 31), Quantity: big.NewRat(10, 1), MarkPrice: usd(100)}},
+		Lots:          []model.Lot{{Instrument: inst, OpenDate: day(2024, 11, 1), Quantity: big.NewRat(10, 1), CostBasis: usd(1000)}},
+		RealizedLots:  []model.RealizedLot{{Instrument: inst, OpenDate: day(2024, 3, 1), CloseDate: day(2024, 11, 1), Quantity: big.NewRat(10, 1), Cost: usd(900)}},
+	}
+	store := fakeStore{big.NewRat(80, 1)}
+	peaks, _ := peak.Compute(st, store, peak.ModeApprox, nil)
+	rep, _ := Build(st, store, peaks, Options{})
+	row := rep.A3[0]
+	if row.AcquiredOn != "2024-03-01" {
+		t.Errorf("acquired = %q, want 2024-03-01 (the closed lot)", row.AcquiredOn)
+	}
+	if got := row.InitialValue.INR.Amount.RatString(); got != "152000" { // (1000+900) * 80
+		t.Errorf("initial = %s, want 152000", got)
+	}
+}
