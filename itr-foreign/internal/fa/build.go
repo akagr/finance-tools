@@ -6,7 +6,8 @@
 // year). Table A2 (the custodial account) and richer entity metadata are M5.
 //
 // Conversion-date conventions (documented assumptions):
-//   - Initial value : TTBR on each lot's acquisition date (or each buy's date).
+//   - Initial value : TTBR on each lot's acquisition date (or each buy's date);
+//     lots closed during the year are included.
 //   - Closing value : TTBR on 31-Dec.
 //   - Dividend      : TTBR on the pay/credit date of each distribution.
 //   - Sale proceeds : TTBR on each sell's trade date.
@@ -139,13 +140,19 @@ func Build(s *model.Statement, store fx.Store, peaks []peak.Result, opts Options
 			row.NatureEntity = firstNonEmpty(e.Nature, row.NatureEntity)
 		}
 
-		// Initial value + acquisition date (vesting date for RSUs).
+		// Initial value + acquisition date (vesting date for RSUs), over every
+		// lot held in the year: open at year end, or closed during it.
 		var initEvents []valuedEvent
 		var acq time.Time
-		if lots := lotsFor(s, k); len(lots) > 0 {
+		lots, closed := lotsFor(s, k), realizedLotsFor(s, k)
+		if len(lots)+len(closed) > 0 {
 			for _, l := range lots {
 				initEvents = append(initEvents, valuedEvent{l.CostBasis, l.AcquiredOn()})
 				acq = earliest(acq, l.AcquiredOn())
+			}
+			for _, l := range closed {
+				initEvents = append(initEvents, valuedEvent{l.Cost, l.OpenDate})
+				acq = earliest(acq, l.OpenDate)
 			}
 		} else {
 			for _, t := range tradesFor(s, k) {
@@ -292,6 +299,16 @@ func convertEvents(store fx.Store, evs []valuedEvent) (Amount, []error) {
 func lotsFor(s *model.Statement, key string) []model.Lot {
 	var out []model.Lot
 	for _, l := range s.Lots {
+		if instKey(l.Instrument) == key {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+func realizedLotsFor(s *model.Statement, key string) []model.RealizedLot {
+	var out []model.RealizedLot
+	for _, l := range s.RealizedLots {
 		if instKey(l.Instrument) == key {
 			out = append(out, l)
 		}

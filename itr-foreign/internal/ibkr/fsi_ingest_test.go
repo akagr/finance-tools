@@ -168,3 +168,46 @@ func TestWithholdingReversalNets(t *testing.T) {
 		t.Errorf("withholding after reversal = %s, want %s", got, want)
 	}
 }
+
+// IBKR's live export puts CLOSED_LOT detail in sibling <Lot> rows that carry
+// cost and P&L but no proceeds or commission; those come from the preceding
+// EXECUTION, split by quantity.
+func TestParseFlexPeriod_SiblingLotRows(t *testing.T) {
+	const xmlDoc = `<FlexQueryResponse><FlexStatements count="1">
+<FlexStatement accountId="U1234567" fromDate="20260401" toDate="20261116">
+<AccountInformation accountId="U1234567" name="Jane Doe" currency="USD"/>
+<Trades>
+<SymbolSummary symbol="VWRA" isin="IE00BK5BQT80" currency="USD" tradeDate="20261116" buySell="SELL" quantity="-10" proceeds="1000" levelOfDetail="SYMBOL_SUMMARY"/>
+<Trade symbol="VWRA" isin="IE00BK5BQT80" currency="USD" tradeDate="20261116" buySell="SELL" quantity="-10" tradePrice="100" proceeds="1000" ibCommission="-2" cost="-900" fifoPnlRealized="98" levelOfDetail="EXECUTION"/>
+<Lot symbol="VWRA" isin="IE00BK5BQT80" currency="USD" tradeDate="20261116" buySell="SELL" quantity="6" cost="500" fifoPnlRealized="98.8" openDateTime="20260410;100000" levelOfDetail="CLOSED_LOT"/>
+<Lot symbol="VWRA" isin="IE00BK5BQT80" currency="USD" tradeDate="20261116" buySell="SELL" quantity="4" cost="400" fifoPnlRealized="-0.8" openDateTime="20260630;100000" levelOfDetail="CLOSED_LOT"/>
+</Trades>
+</FlexStatement></FlexStatements></FlexQueryResponse>`
+	st, err := ParseFlexPeriod(strings.NewReader(xmlDoc), FinancialYear(2026))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got := len(st.Trades); got != 1 {
+		t.Errorf("trades = %d, want 1 (summary and lot rows are not executions)", got)
+	}
+	if got := len(st.RealizedLots); got != 2 {
+		t.Fatalf("realized lots = %d, want 2", got)
+	}
+	for i, want := range []struct{ proceeds, commission, pnl string }{
+		{"600.00", "-1.20", "98.80"},
+		{"400.00", "-0.80", "-0.80"},
+	} {
+		l := st.RealizedLots[i]
+		if got := l.Proceeds.Amount.FloatString(2); got != want.proceeds {
+			t.Errorf("lot %d proceeds = %s, want %s", i, got, want.proceeds)
+		}
+		if got := l.Commission.Amount.FloatString(2); got != want.commission {
+			t.Errorf("lot %d commission = %s, want %s", i, got, want.commission)
+		}
+		gain := new(big.Rat).Sub(l.Proceeds.Amount, l.Cost.Amount)
+		gain.Add(gain, l.Commission.Amount)
+		if got := gain.FloatString(2); got != want.pnl {
+			t.Errorf("lot %d gain = %s, want IBKR's P&L %s", i, got, want.pnl)
+		}
+	}
+}
